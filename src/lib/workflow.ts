@@ -55,3 +55,23 @@ export const ACTION_LABELS: Record<string, string> = {
 export function actionLabel(action: string): string {
   return ACTION_LABELS[action] ?? action.replace(/_/g, " ");
 }
+
+// ─── State-machine transition guard ───────────────────────────────────────────
+
+import type { threadStatusEnum } from "@/db/schema";
+
+type ThreadStatus = (typeof threadStatusEnum.enumValues)[number];
+
+const ALLOWED_TRANSITIONS: Record<ThreadStatus, Set<ThreadStatus>> = {
+  open:           new Set(["pending_review", "escalated"]),
+  pending_review: new Set(["drafted", "escalated"]),
+  drafted:        new Set(["sent", "pending_review", "escalated"]),
+  sent:           new Set(["resolved", "open", "escalated"]),
+  resolved:       new Set(["open", "escalated"]),
+  escalated:      new Set(["open", "escalated"]),
+};
+
+export function isValidTransition(from: ThreadStatus, to: ThreadStatus): boolean {
+  if (to === "escalated") return true;
+  return ALLOWED_TRANSITIONS[from]?.has(to) ?? false;
+}
