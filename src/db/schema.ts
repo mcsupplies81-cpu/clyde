@@ -15,7 +15,7 @@ const createdAt = timestamp("created_at", { withTimezone: true }).defaultNow().n
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "agent", "viewer"]);
 export const inboxProviderEnum = pgEnum("inbox_provider", ["gmail", "outlook", "imap", "other"]);
-export const threadStatusEnum = pgEnum("thread_status", ["open", "pending_review", "drafted", "resolved", "escalated"]);
+export const threadStatusEnum = pgEnum("thread_status", ["open", "pending_review", "drafted", "sent", "resolved", "escalated"]);
 export const threadPriorityEnum = pgEnum("thread_priority", ["low", "normal", "high", "urgent"]);
 export const messageDirectionEnum = pgEnum("message_direction", ["inbound", "outbound"]);
 export const draftStatusEnum = pgEnum("draft_status", ["pending", "approved", "rejected", "edited"]);
@@ -189,6 +189,7 @@ export const aiClassifications = pgTable(
     extractedLane: text("extracted_lane"),
     suggestedAction: text("suggested_action"),
     reasoning: text("reasoning"),
+    extractedEntities: jsonb("extracted_entities").$type<Record<string, string | null | undefined>>(),
     createdAt,
   },
   (t) => [

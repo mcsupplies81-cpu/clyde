@@ -1,76 +1,390 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useFormStatus } from "react-dom";
+import { useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
+import {
+  classifyMessageAction,
+  generateDraftAction,
+  approveDraftAction,
+  rejectDraftAction,
+  editDraftAction,
+  markSentManuallyAction,
+  resolveThreadAction,
+} from "./actions";
 
-function SubmitButton({ label, pendingLabel, style }: { label: string; pendingLabel: string; style: CSSProperties }) {
+function SubmitButton({
+  label,
+  pendingLabel,
+  style,
+}: {
+  label: string;
+  pendingLabel: string;
+  style: CSSProperties;
+}) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} style={{ ...style, opacity: pending ? 0.7 : 1, cursor: pending ? "wait" : "pointer" }}>
+    <button
+      type="submit"
+      disabled={pending}
+      style={{ ...style, opacity: pending ? 0.6 : 1, cursor: pending ? "wait" : "pointer" }}
+    >
       {pending ? pendingLabel : label}
     </button>
   );
 }
 
+// ─── Classify ────────────────────────────────────────────────────────────────
+
 export function ClassifyForm({
-  action,
   message,
+  hasClassification,
+  threadId,
 }: {
-  action: (formData: FormData) => void | Promise<void>;
   message: { id: string; subject: string | null; body: string; senderName: string | null; senderEmail: string };
+  hasClassification?: boolean;
+  threadId?: string;
 }) {
   return (
-    <form action={action} style={{ marginTop: 10 }}>
-      <input type="hidden" name="messageId" value={message.id} />
-      <input type="hidden" name="subject" value={message.subject ?? ""} />
-      <input type="hidden" name="body" value={message.body} />
-      <input type="hidden" name="senderName" value={message.senderName ?? ""} />
+    <form action={classifyMessageAction} style={{ marginTop: 10 }}>
+      <input type="hidden" name="messageId"   value={message.id} />
+      <input type="hidden" name="subject"     value={message.subject ?? ""} />
+      <input type="hidden" name="body"        value={message.body} />
+      <input type="hidden" name="senderName"  value={message.senderName ?? ""} />
       <input type="hidden" name="senderEmail" value={message.senderEmail} />
+      {threadId && <input type="hidden" name="threadId" value={threadId} />}
       <SubmitButton
-        label="Classify"
-        pendingLabel="Classifying..."
-        style={{ padding: "6px 14px", background: "#1a2535", color: "#d6e0eb", border: "1px solid #253347", borderRadius: 5, fontSize: 12 }}
+        label={hasClassification ? "Re-classify" : "Classify with AI"}
+        pendingLabel="Classifying…"
+        style={{
+          padding: "5px 12px",
+          background: "#EFF6FF",
+          color: "#2563EB",
+          border: "1px solid #BFDBFE",
+          borderRadius: 5,
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: "0.2px",
+        }}
       />
     </form>
   );
 }
 
-export function GenerateDraftForm({ action, messageId, classificationId, loadId }: { action: (formData: FormData) => void | Promise<void>; messageId: string; classificationId?: string; loadId?: string }) {
+// ─── Generate draft ───────────────────────────────────────────────────────────
+
+export function GenerateDraftForm({
+  messageId,
+  classificationId,
+  loadId,
+  threadId,
+}: {
+  messageId: string;
+  classificationId?: string;
+  loadId?: string;
+  threadId?: string;
+}) {
   return (
-    <form action={action} style={{ marginTop: 12 }}>
+    <form action={generateDraftAction}>
       <input type="hidden" name="messageId" value={messageId} />
-      {classificationId ? <input type="hidden" name="classificationId" value={classificationId} /> : null}
-      {loadId ? <input type="hidden" name="loadId" value={loadId} /> : null}
-      <SubmitButton label="Generate Draft" pendingLabel="Generating..." style={{ padding: "8px 12px", background: "#1a2535", border: "1px solid #253347", borderRadius: 6, color: "#60a5fa", fontSize: 12 }} />
+      {classificationId && <input type="hidden" name="classificationId" value={classificationId} />}
+      {loadId && <input type="hidden" name="loadId" value={loadId} />}
+      {threadId && <input type="hidden" name="threadId" value={threadId} />}
+      <SubmitButton
+        label="Generate Draft Reply"
+        pendingLabel="Generating…"
+        style={{
+          padding: "9px 18px",
+          background: "#2563EB",
+          border: "none",
+          borderRadius: 6,
+          color: "#FFFFFF",
+          fontSize: 12,
+          fontWeight: 600,
+        }}
+      />
     </form>
   );
 }
 
-export function DraftActions({ approveAction, rejectAction, editAction }: { approveAction: (formData: FormData) => void | Promise<void>; rejectAction: (formData: FormData) => void | Promise<void>; editAction: (formData: FormData) => void | Promise<void> }) {
+// ─── Draft actions (approve / edit / reject) ──────────────────────────────────
+
+export function DraftActions({
+  draftId,
+  threadId,
+  draftBody,
+}: {
+  draftId: string;
+  threadId?: string;
+  draftBody: string;
+}) {
   const [isEditing, setIsEditing] = useState(false);
+
   return (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-      <form action={approveAction}>
-        <SubmitButton label="Approve & Send Manually" pendingLabel="Approving..." style={{ padding: "6px 14px", background: "#22c55e", color: "#000", border: "none", borderRadius: 5, fontSize: 12, fontWeight: 600 }} />
-      </form>
-      {!isEditing ? (
-        <button type="button" onClick={() => setIsEditing(true)} style={{ padding: "6px 14px", background: "#1e2d3d", color: "#d6e0eb", border: "1px solid #253347", borderRadius: 5, fontSize: 12, cursor: "pointer" }}>
-          Edit
-        </button>
-      ) : null}
-      <form action={rejectAction}>
-        <SubmitButton label="Reject" pendingLabel="Rejecting..." style={{ padding: "6px 14px", background: "transparent", color: "#f87171", border: "1px solid #450a0a", borderRadius: 5, fontSize: 12 }} />
-      </form>
-      {isEditing ? (
-        <form action={editAction} style={{ width: "100%", marginTop: 10 }}>
-          <textarea name="draftBody" required style={{ width: "100%", minHeight: 120, background: "#141c24", color: "#d6e0eb", border: "1px solid #253347", borderRadius: 6, padding: 8, marginBottom: 8 }} />
+      {!isEditing && (
+        <>
+          <form action={approveDraftAction}>
+            <input type="hidden" name="draftId" value={draftId} />
+            {threadId && <input type="hidden" name="threadId" value={threadId} />}
+            <SubmitButton
+              label="Approve Draft"
+              pendingLabel="Approving…"
+              style={{
+                padding: "7px 14px",
+                background: "#16A34A",
+                color: "#FFFFFF",
+                border: "none",
+                borderRadius: 5,
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            />
+          </form>
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            style={{
+              padding: "7px 14px",
+              background: "#F9FAFB",
+              color: "#5D5D5D",
+              border: "1px solid #E8E8E8",
+              borderRadius: 5,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            Edit
+          </button>
+          <form action={rejectDraftAction}>
+            <input type="hidden" name="draftId" value={draftId} />
+            <SubmitButton
+              label="Reject"
+              pendingLabel="Rejecting…"
+              style={{
+                padding: "7px 14px",
+                background: "transparent",
+                color: "#DC2626",
+                border: "1px solid #FECACA",
+                borderRadius: 5,
+                fontSize: 12,
+              }}
+            />
+          </form>
+        </>
+      )}
+      {isEditing && (
+        <form action={editDraftAction} style={{ width: "100%" }}>
+          <input type="hidden" name="draftId" value={draftId} />
+          <textarea
+            name="draftBody"
+            required
+            defaultValue={draftBody}
+            style={{
+              width: "100%",
+              minHeight: 140,
+              background: "#FFFFFF",
+              color: "#292929",
+              border: "1px solid #E8E8E8",
+              borderRadius: 6,
+              padding: 10,
+              marginBottom: 8,
+              fontSize: 13,
+              lineHeight: 1.7,
+              resize: "vertical",
+              outline: "none",
+            }}
+          />
           <div style={{ display: "flex", gap: 8 }}>
-            <SubmitButton label="Save Edit" pendingLabel="Saving..." style={{ padding: "6px 14px", background: "#1e2d3d", color: "#d6e0eb", border: "1px solid #253347", borderRadius: 5, fontSize: 12 }} />
-            <button type="button" onClick={() => setIsEditing(false)} style={{ padding: "6px 14px", background: "transparent", color: "#7f92a8", border: "1px solid #253347", borderRadius: 5, fontSize: 12, cursor: "pointer" }}>Cancel</button>
+            <SubmitButton
+              label="Save & Re-submit"
+              pendingLabel="Saving…"
+              style={{
+                padding: "7px 14px",
+                background: "#2563EB",
+                color: "#FFFFFF",
+                border: "none",
+                borderRadius: 5,
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              style={{
+                padding: "7px 14px",
+                background: "transparent",
+                color: "#9CA3AF",
+                border: "1px solid #E8E8E8",
+                borderRadius: 5,
+                fontSize: 12,
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
           </div>
         </form>
-      ) : null}
+      )}
+    </div>
+  );
+}
+
+// ─── Mark sent manually ───────────────────────────────────────────────────────
+
+export function MarkSentForm({ threadId }: { threadId: string }) {
+  return (
+    <form action={markSentManuallyAction}>
+      <input type="hidden" name="threadId" value={threadId} />
+      <SubmitButton
+        label="Mark as Sent Manually"
+        pendingLabel="Marking…"
+        style={{
+          padding: "8px 16px",
+          background: "#16A34A",
+          color: "#FFFFFF",
+          border: "none",
+          borderRadius: 6,
+          fontSize: 12,
+          fontWeight: 700,
+          width: "100%",
+          textAlign: "left",
+        }}
+      />
+    </form>
+  );
+}
+
+// ─── Resolve thread ───────────────────────────────────────────────────────────
+
+export function ResolveThreadForm({ threadId }: { threadId: string }) {
+  return (
+    <form action={resolveThreadAction}>
+      <input type="hidden" name="threadId" value={threadId} />
+      <SubmitButton
+        label="Resolve Thread"
+        pendingLabel="Resolving…"
+        style={{
+          padding: "8px 16px",
+          background: "#F0FDF4",
+          color: "#16A34A",
+          border: "1px solid #D1FAE5",
+          borderRadius: 6,
+          fontSize: 12,
+          fontWeight: 700,
+          width: "100%",
+          textAlign: "left",
+        }}
+      />
+    </form>
+  );
+}
+
+// ─── Copy to clipboard ────────────────────────────────────────────────────────
+
+export function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      style={{
+        padding: "7px 14px",
+        background: "#F9FAFB",
+        color: copied ? "#16A34A" : "#2563EB",
+        border: `1px solid ${copied ? "#D1FAE5" : "#BFDBFE"}`,
+        borderRadius: 5,
+        fontSize: 12,
+        cursor: "pointer",
+        fontWeight: 500,
+        transition: "color 0.15s, border-color 0.15s",
+      }}
+    >
+      {copied ? "Copied!" : "Copy to Clipboard"}
+    </button>
+  );
+}
+
+// ─── Keyboard navigation ──────────────────────────────────────────────────────
+
+export function KeyboardNav({
+  threadIds,
+  currentId,
+  filter,
+  canGenerate,
+  canApprove,
+  canMarkSent,
+  canResolve,
+}: {
+  threadIds: string[];
+  currentId: string | undefined;
+  filter?: string;
+  canGenerate?: boolean;
+  canApprove?: boolean;
+  canMarkSent?: boolean;
+  canResolve?: boolean;
+}) {
+  const router = useRouter();
+
+  const navigate = useCallback(
+    (dir: "next" | "prev") => {
+      const idx = threadIds.indexOf(currentId ?? "");
+      const filterParam = filter ? `&filter=${filter}` : "";
+      if (dir === "next") {
+        const next = threadIds[idx + 1];
+        if (next) router.push(`/app/inbox?threadId=${next}${filterParam}`);
+      } else {
+        const prev = threadIds[idx - 1];
+        if (prev) router.push(`/app/inbox?threadId=${prev}${filterParam}`);
+      }
+    },
+    [threadIds, currentId, filter, router],
+  );
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+
+      switch (e.key) {
+        case "j": case "ArrowDown": e.preventDefault(); navigate("next"); break;
+        case "k": case "ArrowUp":   e.preventDefault(); navigate("prev"); break;
+        case "g": if (canGenerate) { e.preventDefault(); } break;
+        case "a": if (canApprove)  { e.preventDefault(); } break;
+        case "s": if (canMarkSent) { e.preventDefault(); } break;
+        case "r": if (canResolve)  { e.preventDefault(); } break;
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navigate, canGenerate, canApprove, canMarkSent, canResolve]);
+
+  return null;
+}
+
+// ─── Shortcuts hint ───────────────────────────────────────────────────────────
+
+export function ShortcutHint() {
+  return (
+    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      {[
+        ["J/K", "Navigate"],
+        ["G", "Generate"],
+        ["A", "Approve"],
+        ["S", "Mark Sent"],
+        ["R", "Resolve"],
+      ].map(([key, label]) => (
+        <span key={key} style={{ fontSize: 10, color: "#9CA3AF", display: "flex", alignItems: "center", gap: 4 }}>
+          <kbd style={{ background: "#F9FAFB", border: "1px solid #E8E8E8", borderRadius: 3, padding: "0 4px", fontFamily: "monospace", fontSize: 9, color: "#5D5D5D" }}>{key}</kbd>
+          {label}
+        </span>
+      ))}
     </div>
   );
 }
