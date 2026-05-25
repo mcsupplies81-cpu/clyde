@@ -39,6 +39,7 @@ export const users = pgTable(
     tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     email: text("email").notNull(),
+    clerkUserId: text("clerk_user_id").unique(),
     role: userRoleEnum("role").notNull().default("agent"),
     createdAt,
   },
