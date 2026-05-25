@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
@@ -12,6 +12,7 @@ import {
   editDraftAction,
   markSentManuallyAction,
   resolveThreadAction,
+  sendDraftViaGmailAction,
 } from "./actions";
 
 function SubmitButton({
@@ -110,16 +111,24 @@ export function GenerateDraftForm({
 
 // ─── Draft actions (approve / edit / reject) ──────────────────────────────────
 
+const BLOCKED_SEND_CATEGORIES = new Set(["detention_accessorial", "billing_invoice", "escalation", "unknown", "quote_request"]);
+
 export function DraftActions({
   draftId,
   threadId,
   draftBody,
+  hasGmailThread,
+  category,
 }: {
   draftId: string;
   threadId?: string;
   draftBody: string;
+  hasGmailThread?: boolean;
+  category?: string | null;
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [sendState, sendFormAction, sendPending] = useActionState(sendDraftViaGmailAction, undefined);
+  const isSendBlocked = category ? BLOCKED_SEND_CATEGORIES.has(category) : false;
 
   return (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -172,6 +181,38 @@ export function DraftActions({
               }}
             />
           </form>
+          {hasGmailThread && !isSendBlocked && (
+            <form action={sendFormAction}>
+              <input type="hidden" name="draftId" value={draftId} />
+              {threadId && <input type="hidden" name="threadId" value={threadId} />}
+              <button
+                type="submit"
+                disabled={sendPending}
+                style={{
+                  padding: "7px 14px",
+                  background: sendPending ? "#E8E8E8" : "#0284C7",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: 5,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: sendPending ? "wait" : "pointer",
+                  opacity: sendPending ? 0.7 : 1,
+                }}
+              >
+                {sendPending ? "Sending…" : "Send via Gmail"}
+              </button>
+            </form>
+          )}
+          {isSendBlocked && (
+            <span style={{ fontSize: 11, color: "#9CA3AF", alignSelf: "center" }}>Manual send required</span>
+          )}
+          {sendState?.error && (
+            <div style={{ width: "100%", color: "#DC2626", fontSize: 11, marginTop: 4 }}>{sendState.error}</div>
+          )}
+          {sendState?.success && (
+            <div style={{ width: "100%", color: "#16A34A", fontSize: 11, marginTop: 4 }}>✓ Sent via Gmail</div>
+          )}
         </>
       )}
       {isEditing && (
