@@ -9,7 +9,7 @@ import {
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { mockClassify, openAiClassify } from "@/lib/ai-classifier";
-import { canAutoSend, requiresHumanApproval, SAFE_TO_AUTO_DRAFT } from "@/lib/safety";
+import { canAutoSend, requiresHumanApproval, SAFE_TO_AUTO_DRAFT, NEVER_AUTO_SEND } from "@/lib/safety";
 
 function getTenantId() {
   return process.env.DEMO_TENANT_ID ?? "";
@@ -566,4 +566,101 @@ export async function syncGmailAction() {
 
   revalidatePath("/app/inbox");
   return { newThreads, newMessages, errors };
+}
+
+// ─── Gmail Send ───────────────────────────────────────────────────────────────
+
+export async function sendDraftViaGmailAction(
+  _prevState: { error?: string; success?: boolean } | undefined,
+  formData: FormData,
+): Promise<{ error?: string; success?: boolean }> {
+  const draftId  = String(formData.get("draftId") ?? "");
+  const threadId = String(formData.get("threadId") ?? "");
+  if (!draftId || !threadId) return { error: "Missing draftId or threadId" };
+
+  const thread = await db.query.emailThreads.findFirst({ where: eq(emailThreads.id, threadId) });
+  if (!thread) return { error: "Thread not found" };
+  if (thread.status === "sent" || thread.status === "resolved") return { error: "Thread is already closed for sending" };
+  if (!thread.gmailThreadId) return { error: "Thread not connected to Gmail — use manual send" };
+
+  const { asc } = await import("drizzle-orm");
+  const messages = await db.query.emailMessages.findMany({ where: eq(emailMessages.threadId, threadId), orderBy: [asc(emailMessages.receivedAt)] });
+  const firstInbound = messages.find((m) => m.direction === "inbound");
+  if (!firstInbound) return { error: "No inbound message found" };
+
+  const classification = await db.query.aiClassifications.findFirst({ where: eq(aiClassifications.messageId, firstInbound.id) });
+  if (classification?.category && NEVER_AUTO_SEND.has(classification.category)) {
+    return { error: "Manual send required for this category" };
+  }
+  if (classification?.confidence !== null && classification?.confidence !== undefined && Number(classification.confidence) < 0.7) {
+    return { error: "Low confidence — please review before sending" };
+  }
+
+  const draft = await db.query.aiDrafts.findFirst({ where: and(eq(aiDrafts.id, draftId), eq(aiDrafts.messageId, firstInbound.id)) });
+  if (!draft) return { error: "Draft not found" };
+  if (!(draft.status === "approved" || draft.status === "edited")) return { error: "Draft must be approved or edited before sending" };
+
+  const inbox = await db.query.inboxes.findFirst({ where: eq(inboxes.id, thread.inboxId) });
+  if (!inbox?.emailAddress) return { error: "Connected inbox address not found" };
+
+  const lastInbound = [...messages].reverse().find((m) => m.direction === "inbound");
+  const refs = messages.map((m) => m.gmailMessageId).filter((v): v is string => Boolean(v));
+
+  const { buildRFC2822Message } = await import("@/lib/gmail-send");
+  const raw = buildRFC2822Message({
+    to: firstInbound.senderEmail,
+    from: inbox.emailAddress,
+    subject: draft.draftSubject ?? thread.subject,
+    body: draft.draftBody,
+    inReplyTo: lastInbound?.gmailMessageId,
+    references: refs,
+  });
+
+  try {
+    const { getGmailClient } = await import("@/lib/gmail");
+    const gmail = await getGmailClient(thread.tenantId);
+    const response = await gmail.users.messages.send({ userId: "me", requestBody: { raw, threadId: thread.gmailThreadId } });
+    const gmailMessageId = response.data.id;
+    if (!gmailMessageId) return { error: "Gmail send failed: missing message ID in response" };
+
+    await db.update(aiDrafts).set({
+      status: "sent",
+      sentAt: new Date(),
+      sentBy: "Marcus Webb",
+      gmailSentMessageId: gmailMessageId,
+      finalBody: draft.draftBody,
+      updatedAt: new Date(),
+    }).where(eq(aiDrafts.id, draft.id));
+
+    await db.update(emailThreads).set({ status: "sent" }).where(eq(emailThreads.id, thread.id));
+
+    await db.insert(emailMessages).values({
+      tenantId: thread.tenantId,
+      threadId: thread.id,
+      direction: "outbound",
+      senderName: "Marcus Webb",
+      senderEmail: inbox.emailAddress,
+      recipientEmail: firstInbound.senderEmail,
+      subject: draft.draftSubject ?? thread.subject,
+      body: draft.draftBody,
+      gmailMessageId,
+      receivedAt: new Date(),
+    });
+
+    await db.insert(auditLogs).values({
+      tenantId: thread.tenantId,
+      actorType: "user",
+      actorName: "Marcus Webb",
+      entityType: "ai_draft",
+      entityId: draft.id,
+      action: "draft_sent_via_gmail",
+      metadata: { draftId: draft.id, gmailMessageId },
+    });
+
+    revalidatePath("/app/inbox");
+    return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return { error: `Gmail send failed: ${message}` };
+  }
 }

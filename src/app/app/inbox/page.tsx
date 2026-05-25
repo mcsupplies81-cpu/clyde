@@ -582,11 +582,13 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
                         {draft.draftBody}
                       </p>
 
-                      {(draft.status === "pending" || draft.status === "edited") && (
+                      {(draft.status === "pending" || draft.status === "edited" || draft.status === "approved") && (
                         <DraftActions
                           draftId={draft.id}
                           threadId={selectedThread.id}
                           draftBody={draft.draftBody}
+                          hasGmailThread={Boolean(selectedThread.gmailThreadId)}
+                          category={classification?.category}
                         />
                       )}
 
