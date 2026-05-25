@@ -61,6 +61,24 @@ export const inboxes = pgTable(
   (t) => [index("inboxes_tenant_id_idx").on(t.tenantId)],
 );
 
+
+
+export const inboxConnections = pgTable(
+  "inbox_connections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    inboxId: uuid("inbox_id").notNull().references(() => inboxes.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("connected"),
+    lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+    createdAt,
+  },
+  (t) => [
+    index("inbox_connections_tenant_id_idx").on(t.tenantId),
+    index("inbox_connections_inbox_id_idx").on(t.inboxId),
+  ],
+);
+
 export const emailThreads = pgTable(
   "email_threads",
   {
@@ -72,6 +90,8 @@ export const emailThreads = pgTable(
     carrierName: text("carrier_name"),
     status: threadStatusEnum("status").notNull().default("open"),
     priority: threadPriorityEnum("priority").notNull().default("normal"),
+    gmailThreadId: text("gmail_thread_id").unique(),
+    gmailHistoryId: text("gmail_history_id"),
     lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
     createdAt,
   },
@@ -93,6 +113,7 @@ export const emailMessages = pgTable(
     senderEmail: text("sender_email").notNull(),
     recipientEmail: text("recipient_email").notNull(),
     subject: text("subject"),
+    gmailMessageId: text("gmail_message_id").unique(),
     body: text("body").notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true }),
     createdAt,

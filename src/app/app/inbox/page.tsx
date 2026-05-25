@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { emailThreads, emailMessages, loads, aiClassifications, aiDrafts, auditLogs } from "@/db/schema";
+import { emailThreads, emailMessages, loads, aiClassifications, aiDrafts, auditLogs, inboxConnections } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CategoryBadge } from "@/components/CategoryBadge";
@@ -7,6 +7,7 @@ import { RiskBadge } from "@/components/RiskBadge";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { ClassifyForm, DraftActions, GenerateDraftForm } from "./InboxActions";
+import { SyncButton } from "./SyncButton";
 
 async function getInboxData(tenantId: string, threadId?: string) {
   const threads = await db.query.emailThreads.findMany({
@@ -54,6 +55,10 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   }
 
   const { threads, selectedThread, messages, classification, matchedLoad, draft } = await getInboxData(tenantId, threadId);
+  const connection = await db.query.inboxConnections.findFirst({
+    where: eq(inboxConnections.tenantId, tenantId),
+    orderBy: [desc(inboxConnections.createdAt)],
+  });
   const firstInbound = messages.find((m) => m.direction === "inbound");
 
   async function classifyMessageAction(formData: FormData) {
@@ -115,8 +120,16 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       {/* Left — thread list */}
       <div style={{ width: 280, minWidth: 280, borderRight: "1px solid #1e2d3d", overflow: "auto" }}>
         <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e2d3d", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#7f92a8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Inbox</span>
-          <span style={{ fontSize: 11, color: "#4a5e75" }}>{threads.length} threads</span>
+          <div>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#7f92a8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Inbox</span>
+            <div style={{ fontSize: 10, color: "#4a5e75", marginTop: 2 }}>
+              Last sync: {connection?.lastSyncAt ? new Date(connection.lastSyncAt).toLocaleString() : "Never"}
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 11, color: "#4a5e75" }}>{threads.length} threads</span>
+            <SyncButton />
+          </div>
         </div>
         {threads.map((t) => (
           <a key={t.id} href={`/app/inbox?threadId=${t.id}`} style={{ display: "block", padding: "12px 16px", borderBottom: "1px solid #141c24", background: t.id === selectedThread?.id ? "#1a2535" : "transparent", textDecoration: "none", borderLeft: t.id === selectedThread?.id ? "2px solid #3b82f6" : "2px solid transparent" }}>
