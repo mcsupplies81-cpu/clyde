@@ -1,0 +1,2 @@
+-- Initial Clyde v1 schema.
+-- Generated from src/db/schema.ts using Drizzle conventions.
