@@ -1,0 +1,7 @@
+body { font-family: Arial, sans-serif; margin: 0; background: #fafafa; color: #111; }
+a { color: #0b57d0; text-decoration: none; }
+.container { max-width: 960px; margin: 0 auto; padding: 20px; }
+.card { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.nav { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.muted { color: #555; }
+.error { border-left: 4px solid #b42318; background: #fef3f2; padding: 12px; }
