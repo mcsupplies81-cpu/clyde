@@ -20,7 +20,8 @@
     "react-dom": "^19.0.0",
     "drizzle-orm": "^0.43.1",
     "postgres": "^3.4.5",
-    "openai": "^4.100.0"
+    "openai": "^4.100.0",
+    "googleapis": "^150.0.1"
   },
   "devDependencies": {
     "@types/node": "^20",
