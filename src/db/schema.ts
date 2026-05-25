@@ -97,6 +97,8 @@ export const emailThreads = pgTable(
     gmailThreadId: text("gmail_thread_id").unique(),
     gmailHistoryId: text("gmail_history_id"),
     lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+    reopenedAt: timestamp("reopened_at", { withTimezone: true }),
+    reopenCount: numeric("reopen_count", { precision: 10, scale: 0 }).notNull().default("0"),
     createdAt,
   },
   (t) => [
@@ -194,6 +196,8 @@ export const aiClassifications = pgTable(
     suggestedAction: text("suggested_action"),
     reasoning: text("reasoning"),
     extractedEntities: jsonb("extracted_entities").$type<Record<string, string | null | undefined>>(),
+    isFollowUp: boolean("is_follow_up").notNull().default(false),
+    followUpType: text("follow_up_type"),
     createdAt,
   },
   (t) => [
