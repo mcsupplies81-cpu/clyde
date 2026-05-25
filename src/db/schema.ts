@@ -18,7 +18,7 @@ export const inboxProviderEnum = pgEnum("inbox_provider", ["gmail", "outlook", "
 export const threadStatusEnum = pgEnum("thread_status", ["open", "pending_review", "drafted", "sent", "resolved", "escalated"]);
 export const threadPriorityEnum = pgEnum("thread_priority", ["low", "normal", "high", "urgent"]);
 export const messageDirectionEnum = pgEnum("message_direction", ["inbound", "outbound"]);
-export const draftStatusEnum = pgEnum("draft_status", ["pending", "approved", "rejected", "edited"]);
+export const draftStatusEnum = pgEnum("draft_status", ["pending", "approved", "rejected", "edited", "sent"]);
 export const actorTypeEnum = pgEnum("actor_type", ["user", "ai", "system"]);
 
 export const tenants = pgTable(
@@ -219,6 +219,8 @@ export const aiDrafts = pgTable(
     confidence: numeric("confidence", { precision: 5, scale: 4 }),
     approvalRequired: boolean("approval_required").notNull().default(true),
     status: draftStatusEnum("status").notNull().default("pending"),
+    approvedBy: text("approved_by"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
     createdAt,
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },

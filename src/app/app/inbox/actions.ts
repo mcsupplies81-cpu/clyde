@@ -9,6 +9,7 @@ import {
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { mockClassify, openAiClassify } from "@/lib/ai-classifier";
+import { canAutoSend, requiresHumanApproval, SAFE_TO_AUTO_DRAFT } from "@/lib/safety";
 
 function getTenantId() {
   return process.env.DEMO_TENANT_ID ?? "";
@@ -139,7 +140,7 @@ export async function approveDraftAction(formData: FormData) {
   const threadId = formData.get("threadId") ? String(formData.get("threadId")) : undefined;
   if (!draftId) return;
 
-  await db.update(aiDrafts).set({ status: "approved", updatedAt: new Date() }).where(eq(aiDrafts.id, draftId));
+  await db.update(aiDrafts).set({ status: "approved", approvedBy: "Marcus Webb", approvedAt: new Date(), updatedAt: new Date() }).where(eq(aiDrafts.id, draftId));
   await db.insert(auditLogs).values({
     tenantId, actorType: "user", actorName: "Marcus Webb",
     entityType: "ai_draft", entityId: draftId,
@@ -233,16 +234,7 @@ export async function escalateThreadAction(formData: FormData) {
 }
 
 // ─── Autopilot ────────────────────────────────────────────────────────────────
-
-// Full-auto: classify → draft → approve → mark sent (no human needed)
-const AUTOPILOT_FULL_AUTO = new Set([
-  "status_request", "carrier_update", "bol_request", "pod_request", "rate_confirmation",
-]);
-// Draft-only: classify → draft (requires human approval)
-const AUTOPILOT_DRAFT_ONLY = new Set([
-  "detention_accessorial", "billing_invoice", "appointment_change", "quote_request",
-]);
-// escalation, unknown → classify only, no draft
+// Category routing is defined in @/lib/safety (NEVER_AUTO_SEND, SAFE_TO_AUTO_DRAFT, etc.)
 
 export type AutopilotResult = {
   total: number;
@@ -333,7 +325,8 @@ export async function runAutopilotAction(): Promise<AutopilotResult> {
 
     const category = cls.category;
 
-    // Classify-only categories — stop here
+    // Classify-only categories — stop here (not in SAFE_TO_AUTO_DRAFT)
+    if (!SAFE_TO_AUTO_DRAFT.has(category) && requiresHumanApproval(category)) { skipped++; continue; }
     if (category === "escalation" || category === "unknown") { skipped++; continue; }
 
     // Skip if draft already exists and isn't rejected
@@ -385,7 +378,9 @@ export async function runAutopilotAction(): Promise<AutopilotResult> {
       draftBody = `Thank you for reaching out regarding ${ref}. Our team has reviewed this and will follow up shortly with the information you requested.\n\nBest regards,\nClyde Freight Operations`;
     }
 
-    const isFullAuto = AUTOPILOT_FULL_AUTO.has(category);
+    const matchConfidence = matchedLoad ? 0.85 : 0;
+    const isFollowUp = cls.isFollowUp ?? false;
+    const isFullAuto = canAutoSend(category, matchConfidence, isFollowUp);
 
     const [insertedDraft] = await db.insert(aiDrafts).values({
       tenantId, messageId: firstMsg.id, loadId: matchedLoad?.id ?? null,
