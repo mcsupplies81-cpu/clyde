@@ -320,6 +320,17 @@ export async function runAutopilotAction(): Promise<AutopilotResult> {
 
     if (!cls) { skipped++; continue; }
 
+    // Skip follow-up threads (customer confirmation, status check after resolution)
+    if (cls.isFollowUp) {
+      await db.insert(auditLogs).values({
+        tenantId, actorType: "system", actorName: "Clyde Autopilot",
+        entityType: "email_thread", entityId: thread.id,
+        action: "autopilot_skipped",
+        metadata: { reason: "follow_up_skip", followUpType: cls.followUpType },
+      });
+      skipped++; continue;
+    }
+
     const category = cls.category;
 
     // Classify-only categories — stop here
@@ -520,10 +531,35 @@ export async function syncGmailAction() {
         if (parsed.date && (!threadLastAt || parsed.date > threadLastAt)) threadLastAt = parsed.date;
       }
 
-      await db.update(emailThreads).set({
-        gmailHistoryId: normalized.gmailHistoryId,
-        lastMessageAt: threadLastAt,
-      }).where(eq(emailThreads.id, threadRowId));
+      // Reopen resolved/drafted threads when new inbound arrives
+      const knownStatus = knownThread?.status;
+      const hasNewInbound = normalized.messages.some((m) => {
+        if (!m.id || knownMessageIds.has(m.id)) return false;
+        const ph = parseHeaders(m.payload?.headers);
+        return ph.fromEmail !== inbox.emailAddress.toLowerCase();
+      });
+      if (hasNewInbound && (knownStatus === "resolved" || knownStatus === "drafted")) {
+        const currentThread = await db.query.emailThreads.findFirst({ where: eq(emailThreads.id, threadRowId) });
+        await db.update(emailThreads).set({
+          status: "open",
+          priority: currentThread?.priority === "urgent" ? "urgent" : "normal",
+          reopenedAt: new Date(),
+          reopenCount: String(Number(currentThread?.reopenCount ?? "0") + 1),
+          gmailHistoryId: normalized.gmailHistoryId,
+          lastMessageAt: threadLastAt,
+        }).where(eq(emailThreads.id, threadRowId));
+        await db.insert(auditLogs).values({
+          tenantId, actorType: "system", actorName: "Gmail Sync",
+          entityType: "email_thread", entityId: threadRowId,
+          action: "thread_reopened",
+          metadata: { reason: "customer_replied_after_resolution" },
+        });
+      } else {
+        await db.update(emailThreads).set({
+          gmailHistoryId: normalized.gmailHistoryId,
+          lastMessageAt: threadLastAt,
+        }).where(eq(emailThreads.id, threadRowId));
+      }
     } catch (error) {
       errors.push(`Thread ${threadId} failed: ${String(error)}`);
     }
