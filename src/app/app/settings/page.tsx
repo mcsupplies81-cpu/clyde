@@ -1,11 +1,22 @@
 import type { CSSProperties } from "react";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { inboxes, tenants } from "@/db/schema";
-import { and, asc, eq } from "drizzle-orm";
+import { inboxConnections, inboxes, tenants } from "@/db/schema";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { AiSettingsClient } from "./AiSettingsClient";
 
 const timezones = ["UTC", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Europe/London"];
+
+
+async function disconnectGmail(formData: FormData) {
+  "use server";
+
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return;
+
+  await db.delete(inboxConnections).where(and(eq(inboxConnections.tenantId, tenantId), eq(inboxConnections.provider, "gmail")));
+  revalidatePath("/app/settings");
+}
 
 async function updateTenantName(formData: FormData) {
   "use server";
@@ -26,6 +37,9 @@ export default async function SettingsPage() {
   const tenant = tenantId ? await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) }) : null;
   const demoInbox = tenantId
     ? await db.query.inboxes.findFirst({ where: and(eq(inboxes.tenantId, tenantId)), orderBy: [asc(inboxes.createdAt)] })
+    : null;
+  const gmailConnection = tenantId
+    ? await db.query.inboxConnections.findFirst({ where: and(eq(inboxConnections.tenantId, tenantId), eq(inboxConnections.provider, "gmail")), orderBy: [desc(inboxConnections.createdAt)] })
     : null;
 
   return (
@@ -81,22 +95,24 @@ export default async function SettingsPage() {
         </section>
 
         <section style={sectionStyle}>
-          <h2 style={sectionTitleStyle}>Integration Status</h2>
-          <div style={integrationGridStyle}>
-            {[
-              ["Gmail", "Not connected", "Coming soon"],
-              ["Outlook", "Not connected", "Coming soon"],
-              ["TMS", "Demo mode — mock data", ""],
-              ["Tracking", "Demo mode — mock data", ""],
-            ].map(([name, status, tooltip]) => (
-              <div key={name} style={integrationCardStyle}>
-                <div style={labelStyle}>{name}</div>
-                <div style={subtleStyle}>{status}</div>
-                {(name === "Gmail" || name === "Outlook") && (
-                  <button disabled title={tooltip || undefined} style={disabledButtonStyle}>Connect</button>
-                )}
-              </div>
-            ))}
+          <h2 style={sectionTitleStyle}>Gmail Integration</h2>
+          <div style={rowStyle}>
+            <div>
+              <div style={labelStyle}>Connection status</div>
+              <div style={subtleStyle}>{gmailConnection ? `Connected: ${gmailConnection.gmailEmail}` : "Not connected"}</div>
+            </div>
+            {gmailConnection ? (
+              <form action={disconnectGmail}>
+                <input type="hidden" name="tenantId" value={tenantId} />
+                <button type="submit" style={dangerButtonStyle}>Disconnect</button>
+              </form>
+            ) : (
+              <a href="/api/auth/gmail" style={buttonStyle}>Connect Gmail</a>
+            )}
+          </div>
+          <div style={rowStyle}>
+            <div style={labelStyle}>Last sync</div>
+            <code style={codeStyle}>{gmailConnection?.lastSyncAt ? new Date(gmailConnection.lastSyncAt).toLocaleString() : "Never"}</code>
           </div>
         </section>
 
@@ -125,6 +141,4 @@ const inputStyle: CSSProperties = { background: "#0b1220", border: "1px solid #2
 const buttonStyle: CSSProperties = { background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" };
 const codeStyle: CSSProperties = { background: "#0b1220", border: "1px solid #1f2937", borderRadius: 6, padding: "5px 8px", color: "#93c5fd", fontSize: 12 };
 const pillStyle: CSSProperties = { padding: "6px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600 };
-const integrationGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 };
-const integrationCardStyle: CSSProperties = { background: "#0b1220", border: "1px solid #1f2937", borderRadius: 8, padding: 12, minHeight: 86, display: "flex", flexDirection: "column", gap: 8 };
-const disabledButtonStyle: CSSProperties = { marginTop: "auto", background: "#1f2937", color: "#94a3b8", border: "1px solid #334155", borderRadius: 6, padding: "6px 10px", fontSize: 12, cursor: "not-allowed" };
+const dangerButtonStyle: CSSProperties = { background: "#7f1d1d", color: "#fecaca", border: "1px solid #b91c1c", borderRadius: 6, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" };

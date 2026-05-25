@@ -61,6 +61,27 @@ export const inboxes = pgTable(
   (t) => [index("inboxes_tenant_id_idx").on(t.tenantId)],
 );
 
+
+export const inboxConnections = pgTable(
+  "inbox_connections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    inboxId: uuid("inbox_id").notNull().references(() => inboxes.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull().default("gmail"),
+    gmailEmail: text("gmail_email").notNull(),
+    accessToken: text("access_token").notNull(),
+    refreshToken: text("refresh_token").notNull(),
+    tokenExpiry: timestamp("token_expiry", { withTimezone: true }).notNull(),
+    lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+    createdAt,
+  },
+  (t) => [
+    index("inbox_connections_tenant_id_idx").on(t.tenantId),
+    index("inbox_connections_inbox_id_idx").on(t.inboxId),
+  ],
+);
+
 export const emailThreads = pgTable(
   "email_threads",
   {
@@ -264,6 +285,7 @@ export const tenantsRelations = relations(tenants, ({ many }) => ({
   loads: many(loads),
   sopRules: many(sopRules),
   auditLogs: many(auditLogs),
+  inboxConnections: many(inboxConnections),
 }));
 
 export const emailThreadsRelations = relations(emailThreads, ({ one, many }) => ({
@@ -283,4 +305,10 @@ export const emailMessagesRelations = relations(emailMessages, ({ one, many }) =
 export const loadsRelations = relations(loads, ({ one, many }) => ({
   tenant: one(tenants, { fields: [loads.tenantId], references: [tenants.id] }),
   documents: many(loadDocuments),
+}));
+
+
+export const inboxConnectionsRelations = relations(inboxConnections, ({ one }) => ({
+  tenant: one(tenants, { fields: [inboxConnections.tenantId], references: [tenants.id] }),
+  inbox: one(inboxes, { fields: [inboxConnections.inboxId], references: [inboxes.id] }),
 }));
