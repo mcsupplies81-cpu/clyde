@@ -4,6 +4,7 @@ import {
   emailThreads, emailMessages, loads,
   aiClassifications, aiDrafts, auditLogs, sopRules, loadDocuments, inboxConnections,
 } from "@/db/schema";
+import { matchLoad } from "@/lib/load-matcher";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { WorkflowBadge } from "@/components/StatusBadge";
 import { CategoryBadge } from "@/components/CategoryBadge";
@@ -133,10 +134,9 @@ async function getInboxData(tenantId: string, threadId?: string, filter?: InboxF
     : [];
   const classification = threadClassifications[0] ?? null;
 
-  // Matched load
-  const matchedLoad = classification?.extractedLoadNumber
-    ? (await db.query.loads.findFirst({ where: and(eq(loads.loadNumber, classification.extractedLoadNumber), eq(loads.tenantId, tenantId)) })) ?? null
-    : null;
+  // Matched load — use multi-signal matcher
+  const loadMatch = classification ? await matchLoad(classification, tenantId, db) : null;
+  const matchedLoad = loadMatch?.load ?? null;
 
   // Latest draft
   const draft = firstInbound
