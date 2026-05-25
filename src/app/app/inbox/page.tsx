@@ -1,9 +1,12 @@
 import { db } from "@/db";
-import { emailThreads, emailMessages, loads, aiClassifications, aiDrafts } from "@/db/schema";
+import { emailThreads, emailMessages, loads, aiClassifications, aiDrafts, auditLogs } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import { RiskBadge } from "@/components/RiskBadge";
+import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { ClassifyForm, DraftActions, GenerateDraftForm } from "./InboxActions";
 
 async function getInboxData(tenantId: string, threadId?: string) {
   const threads = await db.query.emailThreads.findMany({
@@ -51,6 +54,61 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   }
 
   const { threads, selectedThread, messages, classification, matchedLoad, draft } = await getInboxData(tenantId, threadId);
+  const firstInbound = messages.find((m) => m.direction === "inbound");
+
+  async function classifyMessageAction(formData: FormData) {
+    "use server";
+    const h = await headers();
+    const proto = h.get("x-forwarded-proto") ?? "http";
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    if (!host) throw new Error("Host header missing");
+    await fetch(`${proto}://${host}/api/ai/classify-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messageId: String(formData.get("messageId") ?? ""),
+        subject: String(formData.get("subject") ?? ""),
+        body: String(formData.get("body") ?? ""),
+        senderName: String(formData.get("senderName") ?? ""),
+        senderEmail: String(formData.get("senderEmail") ?? ""),
+      }),
+    });
+    revalidatePath("/app/inbox");
+  }
+
+  async function generateDraftAction(formData: FormData) {
+    "use server";
+    const h = await headers();
+    const proto = h.get("x-forwarded-proto") ?? "http";
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    if (!host) throw new Error("Host header missing");
+    await fetch(`${proto}://${host}/api/ai/draft-reply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messageId: String(formData.get("messageId") ?? ""),
+        classificationId: formData.get("classificationId") ? String(formData.get("classificationId")) : undefined,
+        loadId: formData.get("loadId") ? String(formData.get("loadId")) : undefined,
+      }),
+    });
+    revalidatePath("/app/inbox");
+  }
+
+  async function updateDraftStatusAction(status: "approved" | "rejected" | "edited", draftBody?: string) {
+    "use server";
+    if (!draft) return;
+    await db.update(aiDrafts).set({ status, draftBody: draftBody ?? draft.draftBody, updatedAt: new Date() }).where(eq(aiDrafts.id, draft.id));
+    await db.insert(auditLogs).values({
+      tenantId,
+      actorType: "user",
+      actorName: "Inbox User",
+      entityType: "ai_draft",
+      entityId: draft.id,
+      action: `draft_${status}`,
+      metadata: { draftId: draft.id, messageId: draft.messageId },
+    });
+    revalidatePath("/app/inbox");
+  }
 
   return (
     <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
@@ -101,6 +159,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
                   <div style={{ marginTop: 8, fontSize: 11, color: msg.direction === "inbound" ? "#60a5fa" : "#4ade80", fontWeight: 500 }}>
                     {msg.direction === "inbound" ? "↓ Inbound" : "↑ Outbound"}
                   </div>
+                  {msg.direction === "inbound" ? <ClassifyForm action={classifyMessageAction} message={msg} /> : null}
                 </div>
               ))}
             </div>
@@ -108,11 +167,20 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
               <div style={{ marginTop: 20, background: "#1a2d1a", border: "1px solid #2d4a2d", borderRadius: 8, padding: 16 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: "#4ade80", marginBottom: 10 }}>AI Draft — Pending Approval</div>
                 <p style={{ margin: "0 0 12px", color: "#a8bdd4", fontSize: 13, whiteSpace: "pre-wrap" }}>{draft.draftBody}</p>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button style={{ padding: "6px 14px", background: "#22c55e", color: "#000", border: "none", borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Approve &amp; Send Manually</button>
-                  <button style={{ padding: "6px 14px", background: "#1e2d3d", color: "#d6e0eb", border: "1px solid #253347", borderRadius: 5, fontSize: 12, cursor: "pointer" }}>Edit</button>
-                  <button style={{ padding: "6px 14px", background: "transparent", color: "#f87171", border: "1px solid #450a0a", borderRadius: 5, fontSize: 12, cursor: "pointer" }}>Reject</button>
-                </div>
+                <DraftActions
+                  approveAction={async () => {
+                    "use server";
+                    await updateDraftStatusAction("approved");
+                  }}
+                  rejectAction={async () => {
+                    "use server";
+                    await updateDraftStatusAction("rejected");
+                  }}
+                  editAction={async (formData) => {
+                    "use server";
+                    await updateDraftStatusAction("edited", String(formData.get("draftBody") ?? ""));
+                  }}
+                />
               </div>
             )}
           </>
@@ -178,6 +246,14 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
                 </div>
               ))}
             </div>
+            {!draft && firstInbound ? (
+              <GenerateDraftForm
+                action={generateDraftAction}
+                messageId={firstInbound.id}
+                classificationId={classification.id}
+                loadId={matchedLoad?.id ?? undefined}
+              />
+            ) : null}
           </div>
         )}
       </div>
