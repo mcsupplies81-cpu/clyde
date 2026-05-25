@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  integer,
   jsonb,
   numeric,
   pgEnum,
@@ -275,6 +276,19 @@ export const auditLogs = pgTable(
   ],
 );
 
+export const autopilotSettings = pgTable(
+  "autopilot_settings",
+  {
+    tenantId: uuid("tenant_id").primaryKey().references(() => tenants.id, { onDelete: "cascade" }),
+    isEnabled: boolean("is_enabled").notNull().default(false),
+    scheduledHour: integer("scheduled_hour").notNull().default(2),
+    timezone: text("timezone").notNull().default("UTC"),
+    lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+    lastRunResult: jsonb("last_run_result").$type<Record<string, unknown>>(),
+  },
+  (t) => [index("autopilot_settings_enabled_idx").on(t.isEnabled)],
+);
+
 export const sopRules = pgTable(
   "sop_rules",
   {
@@ -300,6 +314,7 @@ export const tenantsRelations = relations(tenants, ({ many }) => ({
   emailThreads: many(emailThreads),
   loads: many(loads),
   sopRules: many(sopRules),
+  autopilotSettings: many(autopilotSettings),
   auditLogs: many(auditLogs),
   inboxConnections: many(inboxConnections),
 }));
@@ -327,4 +342,8 @@ export const loadsRelations = relations(loads, ({ one, many }) => ({
 export const inboxConnectionsRelations = relations(inboxConnections, ({ one }) => ({
   tenant: one(tenants, { fields: [inboxConnections.tenantId], references: [tenants.id] }),
   inbox: one(inboxes, { fields: [inboxConnections.inboxId], references: [inboxes.id] }),
+}));
+
+export const autopilotSettingsRelations = relations(autopilotSettings, ({ one }) => ({
+  tenant: one(tenants, { fields: [autopilotSettings.tenantId], references: [tenants.id] }),
 }));
