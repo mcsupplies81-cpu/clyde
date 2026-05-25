@@ -3,14 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --bg: #0f1419;
-  --surface-1: #141c24;
-  --surface-2: #1a2535;
-  --surface-3: #1f2d3d;
-  --border: #253347;
-  --text-primary: #d6e0eb;
-  --text-secondary: #7f92a8;
-  --text-muted: #4a5e75;
+  --bg: #FAFAF8;
+  --surface-1: #FFFFFF;
+  --surface-2: #F9FAFB;
+  --border: #E8E8E8;
+  --text-primary: #292929;
+  --text-secondary: #5D5D5D;
+  --text-muted: #9CA3AF;
 }
 
 * { box-sizing: border-box; }
@@ -26,4 +25,25 @@ body {
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 2px; }
+
+/* ── Inbox responsive layout ─────────────────────────────────────────────── */
+
+/* Back button hidden on desktop */
+.inbox-back-btn { display: none !important; }
+
+@media (max-width: 767px) {
+  /* Always hide right panel on mobile */
+  .inbox-right { display: none !important; }
+
+  /* Full width columns */
+  .inbox-threads { width: 100% !important; min-width: 0 !important; border-right: none !important; }
+  .inbox-center  { width: 100% !important; }
+
+  /* No thread selected → show thread list, hide center */
+  .inbox-root[data-has-thread="false"] .inbox-center { display: none !important; }
+
+  /* Thread selected → hide thread list, show center + back button */
+  .inbox-root[data-has-thread="true"] .inbox-threads { display: none !important; }
+  .inbox-root[data-has-thread="true"] .inbox-back-btn { display: flex !important; }
+}

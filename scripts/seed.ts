@@ -82,7 +82,7 @@ async function main() {
   ]);
 
   // Email threads + messages
-  type ThreadSeed = { subject: string; customerName?: string; carrierName?: string; status: schema.threadStatusEnum; priority: schema.threadPriorityEnum; loadNumber?: string; messages: { direction: schema.messageDirectionEnum; senderName: string; senderEmail: string; recipientEmail: string; body: string; hoursAgo: number }[] };
+  type ThreadSeed = { subject: string; customerName?: string; carrierName?: string; status: typeof schema.threadStatusEnum.enumValues[number]; priority: typeof schema.threadPriorityEnum.enumValues[number]; loadNumber?: string; messages: { direction: typeof schema.messageDirectionEnum.enumValues[number]; senderName: string; senderEmail: string; recipientEmail: string; body: string; hoursAgo: number }[] };
 
   const threads: ThreadSeed[] = [
     {

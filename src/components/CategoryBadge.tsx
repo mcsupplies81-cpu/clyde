@@ -1,21 +1,32 @@
-const cat: Record<string, { label: string; color: string }> = {
-  status_request: { label: "Status", color: "#60a5fa" },
-  quote_request: { label: "Quote", color: "#a78bfa" },
-  pod_request: { label: "POD", color: "#34d399" },
-  bol_request: { label: "BOL", color: "#6ee7b7" },
-  rate_confirmation: { label: "Rate Con", color: "#93c5fd" },
-  carrier_update: { label: "Carrier Update", color: "#7dd3fc" },
-  appointment_change: { label: "Appointment", color: "#fde047" },
-  detention_accessorial: { label: "Detention", color: "#fb923c" },
-  billing_invoice: { label: "Billing", color: "#c4b5fd" },
-  escalation: { label: "Escalation", color: "#f87171" },
-  unknown: { label: "Unknown", color: "#7f92a8" },
+type CatConfig = { label: string; color: string; bg: string };
+
+const CAT: Record<string, CatConfig> = {
+  status_request:        { label: "Status Update",  color: "#1D4ED8", bg: "#EFF6FF" },
+  quote_request:         { label: "Quote Request",  color: "#7C3AED", bg: "#F5F3FF" },
+  pod_request:           { label: "POD Request",    color: "#059669", bg: "#ECFDF5" },
+  bol_request:           { label: "BOL Request",    color: "#0D9488", bg: "#F0FDFA" },
+  rate_confirmation:     { label: "Rate Con",       color: "#2563EB", bg: "#EFF6FF" },
+  carrier_update:        { label: "Carrier Update", color: "#0284C7", bg: "#F0F9FF" },
+  appointment_change:    { label: "Appointment",    color: "#D97706", bg: "#FFFBEB" },
+  detention_accessorial: { label: "Detention",      color: "#EA580C", bg: "#FFF7ED" },
+  billing_invoice:       { label: "Billing",        color: "#7C3AED", bg: "#F5F3FF" },
+  escalation:            { label: "Escalation",     color: "#DC2626", bg: "#FEF2F2" },
+  unknown:               { label: "Unclassified",   color: "#6B7280", bg: "#F9FAFB" },
 };
 
 export function CategoryBadge({ category }: { category: string }) {
-  const c = cat[category] ?? { label: category, color: "#7f92a8" };
+  const c = CAT[category] ?? { label: category.replace(/_/g, " "), color: "#6B7280", bg: "#F9FAFB" };
   return (
-    <span style={{ fontSize: 11, fontWeight: 500, color: c.color, background: `${c.color}1a`, padding: "2px 7px", borderRadius: 4, whiteSpace: "nowrap" }}>
+    <span style={{
+      fontSize: 11,
+      fontWeight: 600,
+      color: c.color,
+      background: c.bg,
+      padding: "2px 8px",
+      borderRadius: 4,
+      whiteSpace: "nowrap",
+      letterSpacing: "0.1px",
+    }}>
       {c.label}
     </span>
   );
