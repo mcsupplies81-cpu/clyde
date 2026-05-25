@@ -2,7 +2,7 @@ import Link from "next/link";
 import { db } from "@/db";
 import {
   emailThreads, emailMessages, loads,
-  aiClassifications, aiDrafts, auditLogs, sopRules, loadDocuments,
+  aiClassifications, aiDrafts, auditLogs, sopRules, loadDocuments, inboxConnections,
 } from "@/db/schema";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { WorkflowBadge } from "@/components/StatusBadge";
@@ -16,6 +16,7 @@ import {
 } from "./InboxActions";
 import { ResolutionPlan } from "./components/ResolutionPlan";
 import { RightContextPanel } from "./components/RightContextPanel";
+import { SyncButton } from "./SyncButton";
 
 // ─── Filter types ─────────────────────────────────────────────────────────────
 
@@ -229,6 +230,10 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     timeline, appliedSops, loadDocs, resolutionPlan,
   } = await getInboxData(tenantId, threadId, filter);
 
+  const connection = await db.query.inboxConnections.findFirst({
+    where: and(eq(inboxConnections.tenantId, tenantId), eq(inboxConnections.status, "connected")),
+    orderBy: [desc(inboxConnections.createdAt)],
+  });
   const firstInbound = messages.find((m) => m.direction === "inbound");
 
   const workflowState = selectedThread
@@ -271,12 +276,22 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         {/* Header + filter tabs */}
         <div style={{ borderBottom: "1px solid #E8E8E8", flexShrink: 0 }}>
           <div style={{ padding: "10px 16px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "1px" }}>
-              Work Queue
-            </span>
-            <span style={{ fontSize: 10, color: "#7F7F7F", background: "#F2F2F2", padding: "2px 8px", borderRadius: 10, fontWeight: 600 }}>
-              {threads.length}
-            </span>
+            <div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "1px" }}>
+                Work Queue
+              </span>
+              {connection?.lastSyncAt && (
+                <div style={{ fontSize: 9, color: "#C4C4C4", marginTop: 1 }}>
+                  Synced {new Date(connection.lastSyncAt).toLocaleTimeString()}
+                </div>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 10, color: "#7F7F7F", background: "#F2F2F2", padding: "2px 8px", borderRadius: 10, fontWeight: 600 }}>
+                {threads.length}
+              </span>
+              {connection && <SyncButton />}
+            </div>
           </div>
           <div style={{ display: "flex", gap: 0, padding: "0 10px", overflowX: "auto" }}>
             {FILTER_TABS.map(({ label, value }) => {
