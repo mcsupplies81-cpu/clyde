@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { aiClassifications, aiDrafts, auditLogs, emailMessages, emailThreads, loads } from "@/db/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
+import { getAvgResponseTime, getResponseTimeByAudit } from "@/lib/analytics";
 
 type CountRow = { label: string; count: number };
 
@@ -40,11 +41,13 @@ function BreakdownCard({ title, rows }: { title: string; rows: CountRow[] }) {
   );
 }
 
-function MetricCard({ label, value, accent }: { label: string; value: number; accent: string }) {
+function MetricCard({ label, value, accent, subLabel }: { label: string; value: string | number; accent: string; subLabel?: string }) {
+  const display = typeof value === "number" ? value.toLocaleString() : value;
   return (
     <div style={{ background: "#FFFFFF", border: "1px solid #E8E8E8", borderRadius: 10, padding: 16, borderTop: `3px solid ${accent}` }}>
-      <div style={{ fontSize: 26, fontWeight: 700, color: "#292929", lineHeight: 1.1 }}>{value.toLocaleString()}</div>
+      <div style={{ fontSize: 26, fontWeight: 700, color: "#292929", lineHeight: 1.1 }}>{display}</div>
       <div style={{ marginTop: 8, color: "#7F7F7F", fontSize: 12 }}>{label}</div>
+      {subLabel ? <div style={{ marginTop: 3, color: "#9CA3AF", fontSize: 11 }}>{subLabel}</div> : null}
     </div>
   );
 }
@@ -67,10 +70,13 @@ export default async function AnalyticsPage() {
     draftsApproved,
     openThreads,
     escalatedThreads,
+    autoSentCount,
     categoriesRaw,
     priorityRaw,
     riskRaw,
     recentActivity,
+    avgResponseAll,
+    avgResponse7d,
   ] = await Promise.all([
     db.$count(emailMessages, and(eq(emailMessages.tenantId, tenantId), eq(emailMessages.direction, "inbound"))),
     db.$count(aiClassifications, eq(aiClassifications.tenantId, tenantId)),
@@ -78,6 +84,7 @@ export default async function AnalyticsPage() {
     db.$count(aiDrafts, and(eq(aiDrafts.tenantId, tenantId), eq(aiDrafts.status, "approved"))),
     db.$count(emailThreads, and(eq(emailThreads.tenantId, tenantId), eq(emailThreads.status, "open"))),
     db.$count(emailThreads, and(eq(emailThreads.tenantId, tenantId), eq(emailThreads.status, "escalated"))),
+    db.$count(auditLogs, and(eq(auditLogs.tenantId, tenantId), eq(auditLogs.action, "autopilot_auto_sent"))),
     db.select({ label: aiClassifications.category, count: sql<number>`count(*)::int` }).from(aiClassifications).where(eq(aiClassifications.tenantId, tenantId)).groupBy(aiClassifications.category),
     db.select({ label: emailThreads.priority, count: sql<number>`count(*)::int` }).from(emailThreads).where(eq(emailThreads.tenantId, tenantId)).groupBy(emailThreads.priority),
     db.select({ label: loads.riskLevel, count: sql<number>`count(*)::int` }).from(loads).where(eq(loads.tenantId, tenantId)).groupBy(loads.riskLevel),
@@ -87,7 +94,11 @@ export default async function AnalyticsPage() {
       limit: 10,
       columns: { id: true, actorName: true, action: true, entityType: true, createdAt: true },
     }),
+    getResponseTimeByAudit(tenantId),
+    getAvgResponseTime(tenantId, 7),
   ]);
+
+  const fmtMin = (n: number) => n < 1 ? "<1 min" : `${Math.round(n)} min`;
 
   const categories = normalizeRows(categoriesRaw);
   const priorities = normalizeRows(priorityRaw);
@@ -100,13 +111,15 @@ export default async function AnalyticsPage() {
         <span style={{ color: "#9CA3AF", fontSize: 12 }}>Tenant: {tenantId.slice(0, 8)}…</span>
       </div>
 
-      <section style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 12 }}>
+      <section style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>
         <MetricCard label="Total inbound emails" value={inboundEmails}    accent="#2563EB" />
         <MetricCard label="Emails classified"    value={classifiedEmails} accent="#16A34A" />
         <MetricCard label="Drafts generated"     value={draftsGenerated}  accent="#D97706" />
         <MetricCard label="Drafts approved"      value={draftsApproved}   accent="#0284C7" />
         <MetricCard label="Open threads"         value={openThreads}      accent="#7C3AED" />
         <MetricCard label="Escalated threads"    value={escalatedThreads} accent="#DC2626" />
+        <MetricCard label="Auto-sent (autopilot)" value={autoSentCount}   accent="#16A34A" />
+        <MetricCard label="Avg response time"    value={fmtMin(avgResponseAll)} accent="#0284C7" subLabel={`7-day: ${fmtMin(avgResponse7d)}`} />
       </section>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
