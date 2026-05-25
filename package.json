@@ -1,0 +1,9 @@
+{
+  "name": "clyde",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "echo 'Static UI build: no compilation required'",
+    "typecheck": "echo 'No TypeScript sources found'"
+  }
+}

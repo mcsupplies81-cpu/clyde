@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clyde v1 — Logistics Inbox</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">Clyde v1</div>
+        <nav>
+          <button class="nav active">Inbox <span>24</span></button>
+          <button class="nav">Approvals <span>6</span></button>
+          <button class="nav">Exceptions <span>8</span></button>
+          <button class="nav">Audit Trail</button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <header class="top">
+          <h1>Logistics inbox</h1>
+          <p class="sub">Prioritized by SLA impact, exception risk, and approval dependencies.</p>
+        </header>
+
+        <section class="cols">
+          <section class="threads card">
+            <h2>Active threads</h2>
+            <div class="thread selected">
+              <div>
+                <strong>BlueLine Foods — Load #7784</strong>
+                <p>Customer update request • Tracking stale</p>
+              </div>
+              <div class="badges">
+                <span class="badge risk">Exception risk</span>
+                <span class="badge warn">Human approval required</span>
+              </div>
+            </div>
+            <div class="thread">
+              <div>
+                <strong>Warden Retail — Load #8011</strong>
+                <p>Carrier confirmation needed</p>
+              </div>
+              <span class="badge neutral">Ready for manual send</span>
+            </div>
+            <div class="empty">No additional high-priority threads.</div>
+          </section>
+
+          <section class="details">
+            <section class="card">
+              <h2>Matched load context</h2>
+              <ul>
+                <li>Lane: PHX → DAL • Dry van • 42,100 lb</li>
+                <li>Pickup window: 14:00–16:00 MST (May 25, 2026)</li>
+                <li>Status feed last sync: 47m ago <span class="badge risk">Tracking stale</span></li>
+              </ul>
+            </section>
+
+            <section class="card">
+              <h2>AI classification</h2>
+              <p>Category: Customer update request</p>
+              <p>Risk: Exception risk (medium-high)</p>
+              <p>Recommended action: Carrier confirmation needed before outbound response.</p>
+            </section>
+
+            <section class="card">
+              <h2>Draft response</h2>
+              <p>Draft prepared and routed for review. Human approval required before send.</p>
+              <button>Ready for manual send</button>
+            </section>
+
+            <section class="card">
+              <h2>Audit timeline</h2>
+              <ol>
+                <li><span>09:11</span> Inbound message parsed and linked to load #7784.</li>
+                <li><span>09:12</span> Classification flagged: Customer update request.</li>
+                <li><span>09:14</span> Carrier API latency exceeded threshold; Tracking stale.</li>
+                <li><span>09:16</span> Draft generated and escalated: Human approval required.</li>
+              </ol>
+            </section>
+          </section>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
