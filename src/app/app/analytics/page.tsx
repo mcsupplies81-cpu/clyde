@@ -71,9 +71,11 @@ export default async function AnalyticsPage() {
     openThreads,
     escalatedThreads,
     autoSentCount,
+    draftsSent,
     categoriesRaw,
     priorityRaw,
     riskRaw,
+    threadStatusRaw,
     recentActivity,
     avgResponseAll,
     avgResponse7d,
@@ -85,13 +87,15 @@ export default async function AnalyticsPage() {
     db.$count(emailThreads, and(eq(emailThreads.tenantId, tenantId), eq(emailThreads.status, "open"))),
     db.$count(emailThreads, and(eq(emailThreads.tenantId, tenantId), eq(emailThreads.status, "escalated"))),
     db.$count(auditLogs, and(eq(auditLogs.tenantId, tenantId), eq(auditLogs.action, "autopilot_auto_sent"))),
+    db.$count(aiDrafts, and(eq(aiDrafts.tenantId, tenantId), eq(aiDrafts.status, "sent"))),
     db.select({ label: aiClassifications.category, count: sql<number>`count(*)::int` }).from(aiClassifications).where(eq(aiClassifications.tenantId, tenantId)).groupBy(aiClassifications.category),
     db.select({ label: emailThreads.priority, count: sql<number>`count(*)::int` }).from(emailThreads).where(eq(emailThreads.tenantId, tenantId)).groupBy(emailThreads.priority),
     db.select({ label: loads.riskLevel, count: sql<number>`count(*)::int` }).from(loads).where(eq(loads.tenantId, tenantId)).groupBy(loads.riskLevel),
+    db.select({ label: emailThreads.status, count: sql<number>`count(*)::int` }).from(emailThreads).where(eq(emailThreads.tenantId, tenantId)).groupBy(emailThreads.status),
     db.query.auditLogs.findMany({
       where: eq(auditLogs.tenantId, tenantId),
       orderBy: [desc(auditLogs.createdAt)],
-      limit: 10,
+      limit: 12,
       columns: { id: true, actorName: true, action: true, entityType: true, createdAt: true },
     }),
     getResponseTimeByAudit(tenantId),
@@ -99,10 +103,12 @@ export default async function AnalyticsPage() {
   ]);
 
   const fmtMin = (n: number) => n < 1 ? "<1 min" : `${Math.round(n)} min`;
+  const sentRate = draftsGenerated > 0 ? Math.round((draftsApproved / draftsGenerated) * 100) : 0;
 
-  const categories = normalizeRows(categoriesRaw);
-  const priorities = normalizeRows(priorityRaw);
-  const risks      = normalizeRows(riskRaw);
+  const categories   = normalizeRows(categoriesRaw);
+  const priorities   = normalizeRows(priorityRaw);
+  const risks        = normalizeRows(riskRaw);
+  const threadStatus = normalizeRows(threadStatusRaw);
 
   return (
     <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16, background: "#FAFAF8", minHeight: "100%" }}>
@@ -112,20 +118,21 @@ export default async function AnalyticsPage() {
       </div>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>
-        <MetricCard label="Total inbound emails" value={inboundEmails}    accent="#2563EB" />
-        <MetricCard label="Emails classified"    value={classifiedEmails} accent="#16A34A" />
-        <MetricCard label="Drafts generated"     value={draftsGenerated}  accent="#D97706" />
-        <MetricCard label="Drafts approved"      value={draftsApproved}   accent="#0284C7" />
-        <MetricCard label="Open threads"         value={openThreads}      accent="#7C3AED" />
-        <MetricCard label="Escalated threads"    value={escalatedThreads} accent="#DC2626" />
-        <MetricCard label="Auto-sent (autopilot)" value={autoSentCount}   accent="#16A34A" />
-        <MetricCard label="Avg response time"    value={fmtMin(avgResponseAll)} accent="#0284C7" subLabel={`7-day: ${fmtMin(avgResponse7d)}`} />
+        <MetricCard label="Inbound emails"        value={inboundEmails}    accent="#2563EB" />
+        <MetricCard label="Classified by AI"      value={classifiedEmails} accent="#16A34A" subLabel={inboundEmails > 0 ? `${Math.round((classifiedEmails/inboundEmails)*100)}% classification rate` : undefined} />
+        <MetricCard label="Drafts generated"      value={draftsGenerated}  accent="#D97706" />
+        <MetricCard label="Approval rate"         value={`${sentRate}%`}   accent="#0284C7" subLabel={`${draftsApproved} approved · ${draftsSent} sent`} />
+        <MetricCard label="Open threads"          value={openThreads}      accent="#7C3AED" />
+        <MetricCard label="Escalated"             value={escalatedThreads} accent="#DC2626" />
+        <MetricCard label="Auto-sent (autopilot)" value={autoSentCount}    accent="#16A34A" />
+        <MetricCard label="Avg response time"     value={fmtMin(avgResponseAll)} accent="#0284C7" subLabel={`7-day avg: ${fmtMin(avgResponse7d)}`} />
       </section>
 
-      <section style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
-        <BreakdownCard title="Emails by category"   rows={categories} />
-        <BreakdownCard title="Threads by priority"  rows={priorities} />
-        <BreakdownCard title="Loads by risk level"  rows={risks} />
+      <section style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>
+        <BreakdownCard title="Emails by category"    rows={categories} />
+        <BreakdownCard title="Thread status"         rows={threadStatus} />
+        <BreakdownCard title="Threads by priority"   rows={priorities} />
+        <BreakdownCard title="Loads by risk level"   rows={risks} />
       </section>
 
       <section style={{ background: "#FFFFFF", border: "1px solid #E8E8E8", borderRadius: 10, padding: 16 }}>

@@ -1,4 +1,4 @@
-export function TopBar() {
+export function TopBar({ companyName }: { companyName?: string | null }) {
   return (
     <header style={{
       height: 46,
@@ -62,7 +62,7 @@ export function TopBar() {
           gap: 7,
           cursor: "pointer",
         }}>
-          <span style={{ fontSize: 11, color: "#7F7F7F" }}>Harbor Freight</span>
+          <span style={{ fontSize: 11, color: "#7F7F7F" }}>{companyName ?? "Clyde"}</span>
           <div style={{
             width: 26,
             height: 26,

@@ -59,7 +59,15 @@ const NAV = [
   { label: "Settings",  href: "/app/settings",  Icon: IconSettings, badge: false },
 ];
 
-export function SidebarNav({ inboxCount = 0 }: { inboxCount?: number }) {
+export function SidebarNav({
+  inboxCount = 0,
+  inboxEmail = null,
+  companyName = null,
+}: {
+  inboxCount?: number;
+  inboxEmail?: string | null;
+  companyName?: string | null;
+}) {
   const path = usePathname();
 
   return (
@@ -85,10 +93,14 @@ export function SidebarNav({ inboxCount = 0 }: { inboxCount?: number }) {
       {/* Inbox status */}
       <div style={{ padding: "10px 16px", borderBottom: "1px solid #F2F2F2" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
-          <span style={{ fontSize: 11, color: "#5D5D5D", fontWeight: 500 }}>ops@harborfreight.demo</span>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: inboxEmail ? "#22C55E" : "#D1D5DB", flexShrink: 0 }} />
+          <span style={{ fontSize: 11, color: "#5D5D5D", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {inboxEmail ?? "No inbox connected"}
+          </span>
         </div>
-        <div style={{ fontSize: 10, color: "#9CA3AF", paddingLeft: 12 }}>Harbor Freight Brokerage</div>
+        <div style={{ fontSize: 10, color: "#9CA3AF", paddingLeft: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {companyName ?? "—"}
+        </div>
       </div>
 
       {/* Nav */}
