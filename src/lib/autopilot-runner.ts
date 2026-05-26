@@ -77,13 +77,33 @@ export async function runAutopilot(tenantId: string, options?: { dryRun?: boolea
       if (process.env.OPENAI_API_KEY) {
         const OpenAI = (await import("openai")).default;
         const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const fmt = (d: Date | null | undefined) => d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
+        const loadContext = matchedLoad ? [
+          `Load #${matchedLoad.loadNumber}`,
+          `Route: ${matchedLoad.originCity}, ${matchedLoad.originState} → ${matchedLoad.destinationCity}, ${matchedLoad.destinationState}`,
+          `Status: ${matchedLoad.currentStatus ?? "Unknown"}`,
+          matchedLoad.carrierName ? `Carrier: ${matchedLoad.carrierName}` : null,
+          matchedLoad.driverName ? `Driver: ${matchedLoad.driverName}${matchedLoad.driverPhone ? ` (${matchedLoad.driverPhone})` : ""}` : null,
+          matchedLoad.pickupAt ? `Pickup: ${fmt(matchedLoad.pickupAt)}` : null,
+          matchedLoad.deliveryAt ? `Delivery: ${fmt(matchedLoad.deliveryAt)}` : null,
+          matchedLoad.eta ? `ETA: ${fmt(matchedLoad.eta)}` : null,
+        ].filter(Boolean).join("\n") : null;
         const context = [
-          `Email subject: ${firstMsg.subject ?? "(none)"}`, `Email body:\n${firstMsg.body}`,
-          matchedLoad ? `\nLoad #${matchedLoad.loadNumber} | ${matchedLoad.originCity}, ${matchedLoad.originState} → ${matchedLoad.destinationCity}, ${matchedLoad.destinationState} | Status: ${matchedLoad.currentStatus}` : "",
-          sops.length ? `\nActive SOPs:\n${sops.map((s) => `- ${s.ruleText}`).join("\n")}` : "",
+          `Email subject: ${firstMsg.subject ?? "(none)"}`,
+          `Email body:\n${firstMsg.body}`,
+          loadContext ? `\nLoad details:\n${loadContext}` : "",
+          sops.length ? `\nSOPs / instructions:\n${sops.map((s) => `- ${s.ruleText}`).join("\n")}` : "",
         ].filter(Boolean).join("\n");
         const completion = await client.chat.completions.create({
-          model: "gpt-4o-mini", messages: [{ role: "system", content: "You are Clyde, a freight ops AI. Draft a concise professional reply under 120 words." }, { role: "user", content: context }],
+          model: "gpt-4o-mini",
+          max_tokens: 300,
+          messages: [
+            {
+              role: "system",
+              content: "You are Clyde, a freight ops AI for a freight brokerage. Draft a concise professional email reply under 150 words. Never invent load details not provided. Always include the load number if available. Sign off as 'Clyde\\nFreight Ops AI'. Body text only, no subject line.",
+            },
+            { role: "user", content: context },
+          ],
         });
         draftBody = completion.choices[0]?.message?.content ?? "Unable to generate draft.";
       } else {
@@ -92,7 +112,9 @@ export async function runAutopilot(tenantId: string, options?: { dryRun?: boolea
       }
 
       const matchConfidence = matchedLoad ? 0.85 : 0;
-      const isFullAuto = canAutoSend(category, matchConfidence, cls.isFollowUp ?? false);
+      // If any active SOP for this category has requireApproval=true, honour it — the rule editor controls autopilot
+      const sopRequiresApproval = sops.some((s) => s.requireApproval);
+      const isFullAuto = !sopRequiresApproval && canAutoSend(category, matchConfidence, cls.isFollowUp ?? false);
 
       const [insertedDraft] = await db.insert(aiDrafts).values({
         tenantId, messageId: firstMsg.id, loadId: matchedLoad?.id ?? null,

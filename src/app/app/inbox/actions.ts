@@ -78,18 +78,48 @@ export async function generateDraftAction(formData: FormData) {
   const [load] = loadId
     ? await db.select().from(loads).where(eq(loads.id, loadId)).limit(1)
     : [];
-  const sops = cls?.category
-    ? await db.select().from(sopRules).where(
-        and(eq(sopRules.tenantId, tenantId), eq(sopRules.isActive, true), eq(sopRules.category, cls.category)),
-      )
-    : [];
+
+  // Fetch SOPs and thread history in parallel
+  const [sops, threadHistory] = await Promise.all([
+    cls?.category
+      ? db.select().from(sopRules).where(
+          and(eq(sopRules.tenantId, tenantId), eq(sopRules.isActive, true), eq(sopRules.category, cls.category)),
+        )
+      : Promise.resolve([]),
+    tid
+      ? db.select({
+          direction: emailMessages.direction,
+          senderName: emailMessages.senderName,
+          body: emailMessages.body,
+          receivedAt: emailMessages.receivedAt,
+        })
+          .from(emailMessages)
+          .where(and(eq(emailMessages.threadId, tid), eq(emailMessages.tenantId, tenantId)))
+          .limit(6)
+      : Promise.resolve([]),
+  ]);
 
   const makeFallbackDraft = () => {
     const ref = load?.loadNumber ? `load #${load.loadNumber}` : "your shipment";
     const cat = cls?.category ?? "general";
     if (cat === "quote_request") return `Thank you for your quote request. We are reviewing the lane details (${message.subject}) and will follow up with pricing shortly.`;
     if (cat === "detention_accessorial") return `Thank you for your message regarding ${ref}. We are reviewing the detention/accessorial details and will respond with next steps shortly.`;
+    if (cat === "pod_request") return `Thank you for your message regarding ${ref}. We are working to retrieve the POD and will send it over shortly.`;
+    if (cat === "bol_request") return `Thank you for reaching out about ${ref}. We will pull the BOL and forward it to you as soon as possible.`;
+    if (cat === "status_request") return `Thank you for checking in on ${ref}. We are actively monitoring this shipment and will provide a status update shortly.`;
     return `Thank you for reaching out regarding ${ref}. Our team is reviewing this and will follow up shortly with the information you requested.`;
+  };
+
+  // Build category-specific guidance for the AI
+  const CATEGORY_GUIDANCE: Record<string, string> = {
+    status_request: "The customer is asking for a status update. Provide the current load status, location if known, and ETA. Be specific with the load number and any relevant timing details.",
+    pod_request: "The customer or carrier is requesting the Proof of Delivery (POD). Acknowledge the request, confirm the load number, and let them know when to expect it or that you are retrieving it.",
+    bol_request: "The customer or carrier needs the Bill of Lading (BOL). Acknowledge the request and confirm you will send it over or are retrieving it.",
+    carrier_update: "A carrier is providing or requesting an update. Acknowledge their communication and respond accordingly to keep the shipment moving.",
+    quote_request: "The customer is requesting a freight quote. Acknowledge the lane details, confirm you received their request, and let them know you will follow up with pricing.",
+    appointment_change: "There is an appointment change request or notification. Acknowledge the change, confirm the load number, and clarify next steps.",
+    detention_accessorial: "This involves detention or an accessorial charge. Be professional, acknowledge the claim, and let them know it is under review. Do not commit to payment.",
+    escalation: "This is an escalated or urgent issue. Respond with urgency, acknowledge the problem, and commit to immediate follow-up.",
   };
 
   let draftBody: string;
@@ -97,23 +127,59 @@ export async function generateDraftAction(formData: FormData) {
     try {
       const OpenAI = (await import("openai")).default;
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 15000 });
+
+      const fmt = (d: Date | null | undefined) => d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
+
+      const loadContext = load ? [
+        `Load #${load.loadNumber}`,
+        `Route: ${load.originCity}, ${load.originState} → ${load.destinationCity}, ${load.destinationState}`,
+        `Status: ${load.currentStatus ?? "Unknown"}`,
+        load.carrierName ? `Carrier: ${load.carrierName}` : null,
+        load.driverName ? `Driver: ${load.driverName}${load.driverPhone ? ` (${load.driverPhone})` : ""}` : null,
+        load.customerName ? `Customer: ${load.customerName}` : null,
+        load.pickupAt ? `Pickup: ${fmt(load.pickupAt)}` : null,
+        load.deliveryAt ? `Delivery: ${fmt(load.deliveryAt)}` : null,
+        load.eta ? `ETA: ${fmt(load.eta)}` : null,
+        load.equipmentType ? `Equipment: ${load.equipmentType}` : null,
+        load.riskLevel && load.riskLevel !== "low" ? `Risk: ${load.riskLevel}` : null,
+        load.internalNotes ? `Notes: ${load.internalNotes}` : null,
+      ].filter(Boolean).join("\n") : null;
+
+      const historyContext = threadHistory.length > 1
+        ? `\nConversation history (oldest first):\n${threadHistory
+            .slice(0, -1) // exclude current message (already in main body)
+            .map((m) => `[${m.direction === "inbound" ? "THEM" : "US"}] ${m.body.slice(0, 200)}`)
+            .join("\n---\n")}`
+        : null;
+
       const context = [
         `Email subject: ${message.subject ?? "(none)"}`,
         `Email body:\n${message.body}`,
-        load
-          ? `\nLoad #${load.loadNumber} | ${load.originCity}, ${load.originState} → ${load.destinationCity}, ${load.destinationState} | Status: ${load.currentStatus} | Carrier: ${load.carrierName} | ETA: ${load.eta?.toISOString() ?? "unknown"} | Risk: ${load.riskLevel}`
-          : "",
-        sops.length ? `\nActive SOPs:\n${sops.map((s) => `- ${s.ruleText}`).join("\n")}` : "",
+        loadContext ? `\nLoad details:\n${loadContext}` : "",
+        historyContext ?? "",
+        sops.length ? `\nSOPs / instructions to follow:\n${sops.map((s) => `- ${s.ruleText}`).join("\n")}` : "",
       ].filter(Boolean).join("\n");
+
+      const categoryNote = cls?.category ? (CATEGORY_GUIDANCE[cls.category] ?? "") : "";
 
       const completion = await client.chat.completions.create({
         model: "gpt-4o-mini",
-        max_tokens: 200,
+        max_tokens: 300,
         messages: [
           {
             role: "system",
-            content:
-              "You are Clyde, a freight ops AI assistant. Draft a concise, professional reply for a freight brokerage operator to send to a customer or carrier. Never invent load details not provided. Keep it under 120 words. Always include the load number if available. Human approval is required before sending — do not say it has been sent.",
+            content: [
+              "You are Clyde, a freight ops AI assistant for a freight brokerage.",
+              "Draft a concise, professional email reply that the broker can send to the customer or carrier.",
+              categoryNote,
+              "Rules:",
+              "- Never invent load details not explicitly provided.",
+              "- Always reference the load number if available.",
+              "- Keep it under 150 words.",
+              "- Do not use subject lines or headers — body text only.",
+              "- Sign off as 'Clyde\\nFreight Ops AI'.",
+              "- Do not say the email has been sent or will be sent automatically.",
+            ].filter(Boolean).join("\n"),
           },
           { role: "user", content: context },
         ],

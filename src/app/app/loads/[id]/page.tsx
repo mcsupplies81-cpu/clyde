@@ -4,7 +4,7 @@ import { auditLogs, emailMessages, emailThreads, loadDocuments, loads, aiClassif
 import { StatusBadge } from "@/components/StatusBadge";
 import { RiskBadge } from "@/components/RiskBadge";
 import { CategoryBadge } from "@/components/CategoryBadge";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { fmtDate, fmtDateTime, fmtCurrency, etaLabel, statusProgress } from "@/lib/format";
 import { actionLabel } from "@/lib/workflow";
@@ -34,19 +34,42 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
     );
   }
 
+  // Find thread IDs that mention this load number via AI classifications
+  const clsForLoad = load.loadNumber
+    ? await db
+        .select({ messageId: aiClassifications.messageId })
+        .from(aiClassifications)
+        .where(and(eq(aiClassifications.tenantId, tenantId), eq(aiClassifications.extractedLoadNumber, load.loadNumber)))
+    : [];
+  const msgIdsForLoad = clsForLoad.map((c) => c.messageId);
+  const threadIdsFromCls = msgIdsForLoad.length
+    ? await db
+        .select({ threadId: emailMessages.threadId })
+        .from(emailMessages)
+        .where(inArray(emailMessages.id, msgIdsForLoad))
+    : [];
+  const clsThreadIds = [...new Set(threadIdsFromCls.map((r) => r.threadId))];
+
   // Fetch all related data in parallel
   const [docs, relatedThreadsRaw, loadAuditLogs] = await Promise.all([
     db.query.loadDocuments.findMany({
       where: and(eq(loadDocuments.loadId, load.id), eq(loadDocuments.tenantId, tenantId)),
       orderBy: [desc(loadDocuments.createdAt)],
     }),
-    load.customerName
-      ? db.query.emailThreads.findMany({
-          where: and(eq(emailThreads.tenantId, tenantId), eq(emailThreads.customerName, load.customerName)),
-          orderBy: [desc(emailThreads.lastMessageAt)],
-          limit: 10,
-        })
-      : Promise.resolve([]),
+    // Match threads by: load number extracted from emails OR customer name
+    db.query.emailThreads.findMany({
+      where: and(
+        eq(emailThreads.tenantId, tenantId),
+        clsThreadIds.length || load.customerName
+          ? or(
+              clsThreadIds.length ? inArray(emailThreads.id, clsThreadIds) : undefined,
+              load.customerName ? eq(emailThreads.customerName, load.customerName) : undefined,
+            )
+          : eq(emailThreads.tenantId, tenantId), // fallback: no filter (returns nothing useful but won't error)
+      ),
+      orderBy: [desc(emailThreads.lastMessageAt)],
+      limit: 12,
+    }),
     db.select().from(auditLogs)
       .where(and(eq(auditLogs.tenantId, tenantId), eq(auditLogs.entityId, load.id)))
       .orderBy(desc(auditLogs.createdAt))
