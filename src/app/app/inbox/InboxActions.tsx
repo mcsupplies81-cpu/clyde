@@ -13,22 +13,26 @@ import {
   markSentManuallyAction,
   resolveThreadAction,
   sendDraftViaGmailAction,
+  demoSendDraftAction,
 } from "./actions";
 
 function SubmitButton({
   label,
   pendingLabel,
   style,
+  shortcutKey,
 }: {
   label: string;
   pendingLabel: string;
   style: CSSProperties;
+  shortcutKey?: string;
 }) {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
       disabled={pending}
+      data-shortcut={shortcutKey}
       style={{ ...style, opacity: pending ? 0.6 : 1, cursor: pending ? "wait" : "pointer" }}
     >
       {pending ? pendingLabel : label}
@@ -95,6 +99,7 @@ export function GenerateDraftForm({
       <SubmitButton
         label="Generate Draft Reply"
         pendingLabel="Generating…"
+        shortcutKey="generate"
         style={{
           padding: "9px 18px",
           background: "#2563EB",
@@ -128,6 +133,7 @@ export function DraftActions({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [sendState, sendFormAction, sendPending] = useActionState(sendDraftViaGmailAction, undefined);
+  const [demoState, demoFormAction, demoPending] = useActionState(demoSendDraftAction, undefined);
   const isSendBlocked = category ? BLOCKED_SEND_CATEGORIES.has(category) : false;
 
   return (
@@ -140,6 +146,7 @@ export function DraftActions({
             <SubmitButton
               label="Approve Draft"
               pendingLabel="Approving…"
+              shortcutKey="approve"
               style={{
                 padding: "7px 14px",
                 background: "#16A34A",
@@ -201,6 +208,31 @@ export function DraftActions({
                 }}
               >
                 {sendPending ? "Sending…" : "Send via Gmail"}
+              </button>
+            </form>
+          )}
+          {/* Demo Send — always available, simulates a real send without Gmail */}
+          {!isSendBlocked && (
+            <form action={demoFormAction}>
+              <input type="hidden" name="draftId" value={draftId} />
+              {threadId && <input type="hidden" name="threadId" value={threadId} />}
+              <button
+                type="submit"
+                disabled={demoPending}
+                title="Simulates sending — creates an outbound record without a real email connection"
+                style={{
+                  padding: "7px 14px",
+                  background: demoPending ? "#E8E8E8" : "#7C3AED",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: 5,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: demoPending ? "wait" : "pointer",
+                  opacity: demoPending ? 0.7 : 1,
+                }}
+              >
+                {demoPending ? "Sending…" : "⚡ Demo Send"}
               </button>
             </form>
           )}
@@ -282,6 +314,7 @@ export function MarkSentForm({ threadId }: { threadId: string }) {
       <SubmitButton
         label="Mark as Sent Manually"
         pendingLabel="Marking…"
+        shortcutKey="mark-sent"
         style={{
           padding: "8px 16px",
           background: "#16A34A",
@@ -307,6 +340,7 @@ export function ResolveThreadForm({ threadId }: { threadId: string }) {
       <SubmitButton
         label="Resolve Thread"
         pendingLabel="Resolving…"
+        shortcutKey="resolve"
         style={{
           padding: "8px 16px",
           background: "#F0FDF4",
@@ -396,10 +430,10 @@ export function KeyboardNav({
       switch (e.key) {
         case "j": case "ArrowDown": e.preventDefault(); navigate("next"); break;
         case "k": case "ArrowUp":   e.preventDefault(); navigate("prev"); break;
-        case "g": if (canGenerate) { e.preventDefault(); } break;
-        case "a": if (canApprove)  { e.preventDefault(); } break;
-        case "s": if (canMarkSent) { e.preventDefault(); } break;
-        case "r": if (canResolve)  { e.preventDefault(); } break;
+        case "g": if (canGenerate) { e.preventDefault(); (document.querySelector("[data-shortcut='generate']") as HTMLButtonElement)?.click(); } break;
+        case "a": if (canApprove)  { e.preventDefault(); (document.querySelector("[data-shortcut='approve']") as HTMLButtonElement)?.click(); } break;
+        case "s": if (canMarkSent) { e.preventDefault(); (document.querySelector("[data-shortcut='mark-sent']") as HTMLButtonElement)?.click(); } break;
+        case "r": if (canResolve)  { e.preventDefault(); (document.querySelector("[data-shortcut='resolve']") as HTMLButtonElement)?.click(); } break;
       }
     }
     window.addEventListener("keydown", onKey);

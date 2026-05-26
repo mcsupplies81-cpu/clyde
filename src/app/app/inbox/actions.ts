@@ -84,34 +84,47 @@ export async function generateDraftAction(formData: FormData) {
       )
     : [];
 
+  const makeFallbackDraft = () => {
+    const ref = load?.loadNumber ? `load #${load.loadNumber}` : "your shipment";
+    const cat = cls?.category ?? "general";
+    if (cat === "quote_request") return `Thank you for your quote request. We are reviewing the lane details (${message.subject}) and will follow up with pricing shortly.`;
+    if (cat === "detention_accessorial") return `Thank you for your message regarding ${ref}. We are reviewing the detention/accessorial details and will respond with next steps shortly.`;
+    return `Thank you for reaching out regarding ${ref}. Our team is reviewing this and will follow up shortly with the information you requested.`;
+  };
+
   let draftBody: string;
   if (process.env.OPENAI_API_KEY) {
-    const OpenAI = (await import("openai")).default;
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const context = [
-      `Email subject: ${message.subject ?? "(none)"}`,
-      `Email body:\n${message.body}`,
-      load
-        ? `\nLoad #${load.loadNumber} | ${load.originCity}, ${load.originState} → ${load.destinationCity}, ${load.destinationState} | Status: ${load.currentStatus} | Carrier: ${load.carrierName} | ETA: ${load.eta?.toISOString() ?? "unknown"} | Risk: ${load.riskLevel}`
-        : "",
-      sops.length ? `\nActive SOPs:\n${sops.map((s) => `- ${s.ruleText}`).join("\n")}` : "",
-    ].filter(Boolean).join("\n");
+    try {
+      const OpenAI = (await import("openai")).default;
+      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 15000 });
+      const context = [
+        `Email subject: ${message.subject ?? "(none)"}`,
+        `Email body:\n${message.body}`,
+        load
+          ? `\nLoad #${load.loadNumber} | ${load.originCity}, ${load.originState} → ${load.destinationCity}, ${load.destinationState} | Status: ${load.currentStatus} | Carrier: ${load.carrierName} | ETA: ${load.eta?.toISOString() ?? "unknown"} | Risk: ${load.riskLevel}`
+          : "",
+        sops.length ? `\nActive SOPs:\n${sops.map((s) => `- ${s.ruleText}`).join("\n")}` : "",
+      ].filter(Boolean).join("\n");
 
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are Clyde, a freight ops AI assistant. Draft a concise, professional reply for a freight brokerage operator to send to a customer or carrier. Never invent load details not provided. Keep it under 120 words. Always include the load number if available. Human approval is required before sending — do not say it has been sent.",
-        },
-        { role: "user", content: context },
-      ],
-    });
-    draftBody = completion.choices[0]?.message?.content ?? "Unable to generate draft.";
+      const completion = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        max_tokens: 200,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are Clyde, a freight ops AI assistant. Draft a concise, professional reply for a freight brokerage operator to send to a customer or carrier. Never invent load details not provided. Keep it under 120 words. Always include the load number if available. Human approval is required before sending — do not say it has been sent.",
+          },
+          { role: "user", content: context },
+        ],
+      });
+      draftBody = completion.choices[0]?.message?.content ?? makeFallbackDraft();
+    } catch (err) {
+      console.error("[generateDraft] OpenAI failed, using fallback:", err);
+      draftBody = makeFallbackDraft();
+    }
   } else {
-    const ref = load?.loadNumber ? `load #${load.loadNumber}` : "your shipment";
-    draftBody = `Thank you for reaching out regarding ${ref}. Our team is reviewing this and will follow up shortly with the information you requested.`;
+    draftBody = makeFallbackDraft();
   }
 
   const [insertedDraft] = await db.insert(aiDrafts).values({
@@ -192,6 +205,19 @@ export async function markSentManuallyAction(formData: FormData) {
   const tenantId = getTenantId();
   const tid = String(formData.get("threadId") ?? "");
   if (!tid) return;
+
+  // Also mark approved drafts as sent so the thread leaves "Ready to Send"
+  const approvedDrafts = await db
+    .select({ id: aiDrafts.id })
+    .from(aiDrafts)
+    .innerJoin(emailMessages, eq(aiDrafts.messageId, emailMessages.id))
+    .where(and(eq(emailMessages.threadId, tid), inArray(aiDrafts.status, ["approved", "edited"])));
+  if (approvedDrafts.length) {
+    await db.update(aiDrafts)
+      .set({ status: "sent", sentAt: new Date(), sentBy: "Marcus Webb (manual)", updatedAt: new Date() })
+      .where(inArray(aiDrafts.id, approvedDrafts.map((d) => d.id)));
+  }
+
   await db.update(emailThreads).set({ status: "sent" }).where(
     and(eq(emailThreads.id, tid), eq(emailThreads.tenantId, tenantId)),
   );
@@ -201,6 +227,56 @@ export async function markSentManuallyAction(formData: FormData) {
     action: "marked_sent_manually", metadata: {},
   });
   revalidatePath("/app/inbox");
+}
+
+// Demo send — simulates a real send without requiring Gmail/Outlook connection.
+// Creates an outbound email record and advances thread state exactly like a real send.
+export async function demoSendDraftAction(_prevState: unknown, formData: FormData) {
+  const tenantId = getTenantId();
+  const draftId = String(formData.get("draftId") ?? "");
+  const tid = String(formData.get("threadId") ?? "");
+  if (!draftId || !tid) return { error: "Missing params" };
+
+  const draft = await db.query.aiDrafts.findFirst({ where: eq(aiDrafts.id, draftId) });
+  if (!draft) return { error: "Draft not found" };
+
+  const thread = await db.query.emailThreads.findFirst({ where: eq(emailThreads.id, tid) });
+  if (!thread) return { error: "Thread not found" };
+
+  const inbox = await db.query.inboxes.findFirst({ where: eq(inboxes.id, thread.inboxId) });
+
+  const now = new Date();
+  const body = draft.finalBody ?? draft.draftBody;
+
+  // Create an outbound email message record
+  await db.insert(emailMessages).values({
+    tenantId,
+    threadId: tid,
+    direction: "outbound",
+    senderName: "Clyde Demo",
+    senderEmail: inbox?.emailAddress ?? "demo@clyde.ai",
+    recipientEmail: "customer@example.com",
+    subject: draft.draftSubject ?? thread.subject,
+    body,
+    receivedAt: now,
+  });
+
+  // Mark draft as sent
+  await db.update(aiDrafts)
+    .set({ status: "sent", sentAt: now, sentBy: "Demo Send", finalBody: body, updatedAt: now })
+    .where(eq(aiDrafts.id, draftId));
+
+  // Advance thread status
+  await db.update(emailThreads).set({ status: "sent" }).where(eq(emailThreads.id, tid));
+
+  await db.insert(auditLogs).values({
+    tenantId, actorType: "user", actorName: "Marcus Webb",
+    entityType: "email_thread", entityId: tid,
+    action: "demo_sent", metadata: { draftId },
+  });
+
+  revalidatePath("/app/inbox");
+  return { success: true };
 }
 
 export async function resolveThreadAction(formData: FormData) {

@@ -1,0 +1,629 @@
+"use client";
+
+import { useState, useCallback, useEffect, useRef } from "react";
+import Link from "next/link";
+import { WorkflowBadge } from "@/components/StatusBadge";
+import { CategoryBadge } from "@/components/CategoryBadge";
+import { deriveWorkflowState, WORKFLOW_LABEL } from "@/lib/workflow";
+import { relativeTime } from "@/lib/format";
+import {
+  ClassifyForm, CopyButton, DraftActions, GenerateDraftForm,
+  MarkSentForm, ResolveThreadForm, ShortcutHint,
+} from "./InboxActions";
+import { RightContextPanel } from "./components/RightContextPanel";
+import { SyncButton } from "./SyncButton";
+import type { ThreadDetail } from "@/lib/inbox-thread-detail";
+
+// ── Client-side prefetch cache ─────────────────────────────────────────────────
+const _detailCache = new Map<string, ThreadDetail>();
+const _pendingFetch = new Map<string, Promise<ThreadDetail>>();
+
+function prefetchThreadDetail(threadId: string): Promise<ThreadDetail> {
+  if (_detailCache.has(threadId)) return Promise.resolve(_detailCache.get(threadId)!);
+  if (_pendingFetch.has(threadId)) return _pendingFetch.get(threadId)!;
+  const p = fetch(`/api/inbox/thread?threadId=${threadId}`)
+    .then((r) => r.json() as Promise<ThreadDetail>)
+    .then((d) => { _detailCache.set(threadId, d); _pendingFetch.delete(threadId); return d; })
+    .catch((e) => { _pendingFetch.delete(threadId); throw e; });
+  _pendingFetch.set(threadId, p);
+  return p;
+}
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+type Thread = {
+  id: string;
+  subject: string;
+  customerName: string | null;
+  carrierName: string | null;
+  status: string;
+  priority: string;
+  gmailThreadId: string | null;
+  lastMessageAt: Date | string | null;
+};
+
+type FirstMsg = { id: string; threadId: string; senderName: string | null; senderEmail: string; direction: string };
+type Classification = { messageId: string; category: string; extractedLoadNumber: string | null; urgency: string | null; [key: string]: unknown };
+type LatestDraft = { messageId: string; status: string; [key: string]: unknown };
+
+type InboxRootProps = {
+  threads: Thread[];
+  firstMsgByThread: Record<string, FirstMsg>;
+  clsByMsg: Record<string, Classification>;
+  latestDraftByMsg: Record<string, LatestDraft>;
+  loadByNumber: Record<string, string>;
+  initialSelectedId: string | null;
+  initialDetail: ThreadDetail | null;
+  connection: { lastSyncAt: Date | string | null } | null;
+  filter: string | undefined;
+};
+
+const FILTER_TABS = [
+  { label: "All",            value: undefined },
+  { label: "Needs Review",   value: "needs_review" },
+  { label: "Ready to Send",  value: "ready_to_send" },
+  { label: "Sent",           value: "sent" },
+  { label: "Escalated",      value: "escalated" },
+  { label: "Resolved",       value: "resolved" },
+  { label: "Needs POD",      value: "pod_request" },
+  { label: "Needs BOL",      value: "bol_request" },
+  { label: "Quotes",         value: "quote_request" },
+  { label: "Status Updates", value: "status_request" },
+  { label: "Appt Changes",   value: "appointment_change" },
+];
+
+const PRIORITY_COLOR: Record<string, string> = {
+  urgent: "#DC2626", high: "#EA580C", normal: "#2563EB", low: "#9CA3AF",
+};
+
+// Status dot shown in thread list items
+const STATUS_DOT: Record<string, string> = {
+  open: "#D1D5DB",
+  pending_review: "#F59E0B",
+  drafted: "#60A5FA",
+  approved_ready_to_send: "#16A34A",
+  sent: "#16A34A",
+  resolved: "#D1D5DB",
+  escalated: "#DC2626",
+};
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
+export function InboxRoot({
+  threads,
+  firstMsgByThread,
+  clsByMsg,
+  latestDraftByMsg,
+  loadByNumber,
+  initialSelectedId,
+  initialDetail,
+  connection,
+  filter,
+}: InboxRootProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
+  const [detail, setDetail] = useState<ThreadDetail | null>(initialDetail);
+  const [isLoading, setIsLoading] = useState(false);
+  const [rightOpen, setRightOpen] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Keep a ref so effects can read the latest selectedId without stale closures
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
+
+  // Seed the module-level cache with SSR data
+  if (initialSelectedId && initialDetail && !_detailCache.has(initialSelectedId)) {
+    _detailCache.set(initialSelectedId, initialDetail);
+  }
+
+  // After server actions (generate draft, approve, etc.) Next.js streams fresh
+  // initialDetail props. useState ignores prop changes after first render — sync here.
+  useEffect(() => {
+    if (!initialDetail || !initialSelectedId) return;
+    _detailCache.set(initialSelectedId, initialDetail);
+    if (initialSelectedId === selectedIdRef.current) {
+      setDetail(initialDetail);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDetail, initialSelectedId]);
+
+  const selectedThread = threads.find((t) => t.id === selectedId) ?? null;
+
+  const selectThread = useCallback(async (threadId: string) => {
+    if (threadId === selectedId) return;
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    setSelectedId(threadId);
+    setIsLoading(true);
+    const filterParam = filter ? `&filter=${filter}` : "";
+    window.history.pushState(null, "", `/app/inbox?threadId=${threadId}${filterParam}`);
+    try {
+      const newDetail = await prefetchThreadDetail(threadId);
+      setDetail(newDetail);
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") console.error("thread fetch error", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedId, filter]);
+
+  // Background prefetch next 6 threads after mount
+  const threadIds = threads.map((t) => t.id);
+  useEffect(() => {
+    const toPreload = threadIds.filter((id) => id !== initialSelectedId).slice(0, 6);
+    let cancelled = false;
+    (async () => {
+      for (const id of toPreload) {
+        if (cancelled) break;
+        prefetchThreadDetail(id).catch(() => {});
+        await new Promise((r) => setTimeout(r, 400));
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keyboard navigation
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+      const idx = threadIds.indexOf(selectedId ?? "");
+      switch (e.key) {
+        case "j": case "ArrowDown": { e.preventDefault(); const next = threadIds[idx + 1]; if (next) selectThread(next); break; }
+        case "k": case "ArrowUp":   { e.preventDefault(); const prev = threadIds[idx - 1]; if (prev) selectThread(prev); break; }
+        case "g": (document.querySelector("[data-shortcut='generate']") as HTMLButtonElement)?.click(); break;
+        case "a": (document.querySelector("[data-shortcut='approve']") as HTMLButtonElement)?.click(); break;
+        case "s": (document.querySelector("[data-shortcut='mark-sent']") as HTMLButtonElement)?.click(); break;
+        case "r": (document.querySelector("[data-shortcut='resolve']") as HTMLButtonElement)?.click(); break;
+        case "\\": setRightOpen(o => !o); break;
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [threadIds, selectedId, selectThread]);
+
+  // Derive workflow state
+  const workflowState = selectedThread && detail
+    ? deriveWorkflowState({
+        threadStatus: selectedThread.status as Parameters<typeof deriveWorkflowState>[0]["threadStatus"],
+        hasClassification: !!detail.classification,
+        hasMatchedLoad: !!detail.matchedLoad,
+        draftStatus: detail.draft?.status as Parameters<typeof deriveWorkflowState>[0]["draftStatus"],
+      })
+    : null;
+
+  const firstInbound = detail?.messages.find((m) => m.direction === "inbound");
+  const hasDraft = !!detail?.draft;
+  const draftSentOrRejected = detail?.draft?.status === "sent" || detail?.draft?.status === "rejected";
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  return (
+    <div style={{ display: "flex", height: "100%", overflow: "hidden", background: "#FAFAF8" }}>
+
+      {/* ── Left: thread list ───────────────────────────────────────────── */}
+      <div style={{ width: 272, minWidth: 272, borderRight: "1px solid #EBEBEB", display: "flex", flexDirection: "column", overflow: "hidden", background: "#FFFFFF" }}>
+
+        {/* Header */}
+        <div style={{ borderBottom: "1px solid #EBEBEB", flexShrink: 0 }}>
+          <div style={{ padding: "10px 14px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#B0B0B0", textTransform: "uppercase", letterSpacing: "0.9px" }}>
+                Inbox
+              </span>
+              {connection?.lastSyncAt && (
+                <div style={{ fontSize: 9, color: "#D1D5DB", marginTop: 1 }}>
+                  Synced {new Date(connection.lastSyncAt).toLocaleTimeString()}
+                </div>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 10, color: "#9CA3AF", background: "#F5F5F5", padding: "2px 7px", borderRadius: 10, fontWeight: 600 }}>
+                {threads.length}
+              </span>
+              {connection && <SyncButton />}
+            </div>
+          </div>
+
+          {/* Filter tabs */}
+          <div style={{ display: "flex", gap: 0, padding: "0 8px", overflowX: "auto" }}>
+            {FILTER_TABS.map(({ label, value }) => {
+              const active = filter === value;
+              const href = value ? `/app/inbox?filter=${value}` : "/app/inbox";
+              return (
+                <Link
+                  key={label}
+                  href={href}
+                  style={{
+                    padding: "5px 7px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
+                    color: active ? "#2563EB" : "#9CA3AF",
+                    borderBottom: active ? "2px solid #2563EB" : "2px solid transparent",
+                  }}
+                >
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Thread list */}
+        <div style={{ overflowY: "auto", flex: 1 }}>
+          {threads.length === 0 && (
+            <div style={{ padding: "48px 16px", textAlign: "center", color: "#C4C4C4", fontSize: 12 }}>
+              No threads here
+            </div>
+          )}
+          {threads.map((t) => {
+            const active = t.id === selectedId;
+            const firstMsg = firstMsgByThread[t.id];
+            const cls = firstMsg ? clsByMsg[firstMsg.id] : null;
+            const latestDraft = firstMsg ? latestDraftByMsg[firstMsg.id] : null;
+            const hasLoad = cls?.extractedLoadNumber ? !!loadByNumber[cls.extractedLoadNumber] : false;
+            const wState = deriveWorkflowState({
+              threadStatus: t.status as Parameters<typeof deriveWorkflowState>[0]["threadStatus"],
+              hasClassification: !!cls,
+              hasMatchedLoad: hasLoad,
+              draftStatus: latestDraft?.status as Parameters<typeof deriveWorkflowState>[0]["draftStatus"],
+            });
+            const dotColor = STATUS_DOT[wState] ?? STATUS_DOT[t.status] ?? "#D1D5DB";
+            const isUrgent = t.priority === "urgent";
+
+            return (
+              <button
+                key={t.id}
+                onClick={() => selectThread(t.id)}
+                onMouseEnter={() => prefetchThreadDetail(t.id)}
+                style={{ display: "block", width: "100%", textAlign: "left", border: "none", padding: 0, background: "none", cursor: "pointer" }}
+              >
+                <div style={{
+                  padding: "9px 12px",
+                  borderBottom: "1px solid #F5F5F5",
+                  background: active ? "#EFF6FF" : "transparent",
+                  borderLeft: `3px solid ${active ? "#2563EB" : isUrgent ? PRIORITY_COLOR.urgent : "transparent"}`,
+                  display: "flex",
+                  gap: 9,
+                  alignItems: "flex-start",
+                }}>
+                  {/* Status dot */}
+                  <div style={{
+                    width: 7, height: 7, borderRadius: "50%",
+                    background: dotColor,
+                    marginTop: 5, flexShrink: 0,
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* Subject */}
+                    <div style={{
+                      fontSize: 12,
+                      fontWeight: active ? 600 : (["open", "pending_review"].includes(t.status) ? 600 : 400),
+                      color: active ? "#1D4ED8" : "#292929",
+                      lineHeight: 1.4, marginBottom: 3,
+                      overflow: "hidden", display: "-webkit-box",
+                      WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                    }}>
+                      {t.subject}
+                    </div>
+                    {/* Sender + time */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: cls ? 3 : 0 }}>
+                      <span style={{ fontSize: 11, color: "#7F7F7F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "65%" }}>
+                        {t.customerName ?? t.carrierName ?? "—"}
+                      </span>
+                      <span style={{ fontSize: 10, color: "#C4C4C4", whiteSpace: "nowrap", flexShrink: 0 }}>
+                        {relativeTime(t.lastMessageAt)}
+                      </span>
+                    </div>
+                    {/* Tags */}
+                    {cls && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" as const }}>
+                        <CategoryBadge category={cls.category} />
+                        {cls.extractedLoadNumber && (
+                          <span style={{ fontSize: 10, color: "#C4C4C4", fontFamily: "monospace" }}>
+                            #{cls.extractedLoadNumber}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ padding: "8px 12px", borderTop: "1px solid #F5F5F5", flexShrink: 0 }}>
+          <ShortcutHint />
+        </div>
+      </div>
+
+      {/* ── Center: email view ──────────────────────────────────────────── */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0, background: "#FAFAF8", position: "relative" }}>
+
+        {/* Loading overlay */}
+        {isLoading && (
+          <div style={{ position: "absolute", inset: 0, background: "rgba(250,250,248,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10 }}>
+            <div style={{ fontSize: 12, color: "#B0B0B0" }}>Loading…</div>
+          </div>
+        )}
+
+        {selectedThread && detail ? (
+          <>
+            {/* Thread header */}
+            <div style={{ padding: "12px 20px", borderBottom: "1px solid #EBEBEB", flexShrink: 0, background: "#FFFFFF" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                <h2 style={{ margin: "0 0 5px", fontSize: 14, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.35, flex: 1 }}>
+                  {selectedThread.subject}
+                </h2>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                  {workflowState && (
+                    <span style={{ fontSize: 11, color: "#9CA3AF" }}>{WORKFLOW_LABEL[workflowState]}</span>
+                  )}
+                  {/* Context panel toggle — keyboard shortcut \ */}
+                  <button
+                    type="button"
+                    onClick={() => setRightOpen(o => !o)}
+                    title={`${rightOpen ? "Hide" : "Show"} context  (\\)`}
+                    style={{
+                      padding: "4px 9px",
+                      background: rightOpen ? "#EFF6FF" : "#F5F5F5",
+                      border: `1px solid ${rightOpen ? "#BFDBFE" : "#E8E8E8"}`,
+                      borderRadius: 5,
+                      fontSize: 11,
+                      color: rightOpen ? "#2563EB" : "#9CA3AF",
+                      cursor: "pointer",
+                      fontWeight: 500,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {rightOpen ? "Hide info" : "Show info"}
+                  </button>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" as const }}>
+                {workflowState && <WorkflowBadge state={workflowState} />}
+                {detail.classification && <CategoryBadge category={detail.classification.category} />}
+                {detail.classification?.urgency && !["normal", "low"].includes(detail.classification.urgency) && (
+                  <span style={{
+                    fontSize: 11, fontWeight: 700,
+                    color: detail.classification.urgency === "critical" ? "#DC2626" : "#EA580C",
+                    background: detail.classification.urgency === "critical" ? "#FEF2F2" : "#FFF7ED",
+                    padding: "2px 7px", borderRadius: 4,
+                  }}>
+                    {detail.classification.urgency.toUpperCase()}
+                  </span>
+                )}
+                {detail.matchedLoad && (
+                  <Link
+                    href={`/app/loads/${detail.matchedLoad.id}`}
+                    style={{ fontSize: 11, color: "#2563EB", background: "#EFF6FF", border: "1px solid #BFDBFE", padding: "2px 8px", borderRadius: 4, textDecoration: "none", fontWeight: 600 }}
+                  >
+                    {detail.matchedLoad.loadNumber} →
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            {/* Conversation + draft */}
+            <div style={{ flex: 1, overflow: "auto", padding: "16px 20px" }}>
+              <div style={{ maxWidth: 760 }}>
+
+                {/* Messages */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+                  {detail.messages.map((msg) => {
+                    const isInbound = msg.direction === "inbound";
+                    return (
+                      <div key={msg.id} style={{
+                        background: "#FFFFFF",
+                        border: `1px solid ${isInbound ? "#EBEBEB" : "#D1FAE5"}`,
+                        borderRadius: 8,
+                        overflow: "hidden",
+                      }}>
+                        <div style={{
+                          padding: "8px 14px",
+                          background: isInbound ? "#FAFAF8" : "#F0FDF4",
+                          borderBottom: `1px solid ${isInbound ? "#F2F2F2" : "#ECFDF5"}`,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{
+                              width: 26, height: 26, borderRadius: 7,
+                              background: isInbound ? "#EFF6FF" : "#DCFCE7",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: 11, fontWeight: 700,
+                              color: isInbound ? "#2563EB" : "#16A34A",
+                              flexShrink: 0,
+                            }}>
+                              {(msg.senderName ?? msg.senderEmail)[0]?.toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A" }}>
+                                {msg.senderName ?? msg.senderEmail}
+                              </div>
+                              <div style={{ fontSize: 10, color: "#B0B0B0" }}>{msg.senderEmail}</div>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ fontSize: 10, color: isInbound ? "#2563EB" : "#16A34A", fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.3px" }}>
+                              {isInbound ? "↓ Received" : "↑ Sent"}
+                            </span>
+                            <span style={{ fontSize: 10, color: "#B0B0B0" }}>{relativeTime(msg.receivedAt)}</span>
+                          </div>
+                        </div>
+                        <div style={{ padding: "12px 14px" }}>
+                          <p style={{ margin: 0, color: "#3D3D3D", fontSize: 13, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{msg.body}</p>
+                        </div>
+                        {isInbound && (
+                          <div style={{ padding: "0 14px 10px" }}>
+                            <ClassifyForm
+                              message={msg as Parameters<typeof ClassifyForm>[0]["message"]}
+                              hasClassification={!!detail.classification}
+                              threadId={selectedThread.id}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* ── Inline AI draft ─────────────────────────────────────── */}
+                {hasDraft && !draftSentOrRejected && (() => {
+                  const d = detail.draft!;
+                  const isApproved = d.status === "approved" || d.status === "edited";
+                  const borderColor = isApproved ? "#86EFAC" : "#93C5FD";
+                  const headerBg   = isApproved ? "#ECFDF5" : "#EFF6FF";
+                  const cardBg     = isApproved ? "#F0FDF4" : "#F8FAFF";
+                  const textColor  = isApproved ? "#15803D" : "#2563EB";
+                  const label =
+                    d.status === "approved" ? "✓ Draft approved" :
+                    d.status === "edited"   ? "✎ Edited draft"  :
+                                             "✦ Clyde's draft reply";
+
+                  return (
+                    <div style={{
+                      marginBottom: 14,
+                      background: cardBg,
+                      border: `1px solid ${borderColor}`,
+                      borderLeft: `3px solid ${isApproved ? "#16A34A" : "#2563EB"}`,
+                      borderRadius: "0 8px 8px 0",
+                      overflow: "hidden",
+                    }}>
+                      {/* Draft header */}
+                      <div style={{
+                        padding: "8px 14px",
+                        background: headerBg,
+                        borderBottom: `1px solid ${borderColor}`,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: textColor }}>{label}</span>
+                        <span style={{ fontSize: 10, color: "#9CA3AF" }}>
+                          {Math.round(Number(d.confidence) * 100)}% confidence
+                        </span>
+                      </div>
+
+                      {/* Draft body */}
+                      <div style={{ padding: "12px 14px" }}>
+                        {d.draftSubject && (
+                          <div style={{ fontSize: 11, color: "#9CA3AF", marginBottom: 6 }}>
+                            Subject: <span style={{ color: "#5D5D5D" }}>{d.draftSubject}</span>
+                          </div>
+                        )}
+                        <p style={{ margin: "0 0 14px", color: "#1A1A1A", fontSize: 13, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
+                          {d.draftBody}
+                        </p>
+                        <DraftActions
+                          draftId={d.id}
+                          threadId={selectedThread.id}
+                          draftBody={d.draftBody}
+                          hasGmailThread={Boolean(selectedThread.gmailThreadId)}
+                          category={detail.classification?.category}
+                        />
+                      </div>
+
+                      {/* Mark sent strip — only when approved and waiting for manual send */}
+                      {workflowState === "approved_ready_to_send" && (
+                        <div style={{
+                          padding: "9px 14px",
+                          borderTop: `1px solid ${borderColor}`,
+                          background: headerBg,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          flexWrap: "wrap" as const,
+                        }}>
+                          <CopyButton text={d.draftBody} />
+                          <span style={{ fontSize: 11, color: "#6B7280", flex: 1 }}>
+                            Copy → paste into your email client → then mark as sent
+                          </span>
+                          <MarkSentForm threadId={selectedThread.id} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Rejected draft notice */}
+                {detail.draft?.status === "rejected" && (
+                  <div style={{ marginBottom: 10, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, fontSize: 12, color: "#9CA3AF" }}>
+                    Draft rejected.
+                  </div>
+                )}
+
+                {/* Resolve banner — compact */}
+                {workflowState === "sent" && (
+                  <div style={{
+                    marginBottom: 14,
+                    padding: "9px 14px",
+                    background: "#F0FDF4",
+                    border: "1px solid #D1FAE5",
+                    borderRadius: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}>
+                    <span style={{ fontSize: 12, color: "#16A34A", fontWeight: 500 }}>
+                      ✓ Reply sent — resolve when fully handled
+                    </span>
+                    <ResolveThreadForm threadId={selectedThread.id} />
+                  </div>
+                )}
+
+                {/* Generate / reply prompt */}
+                {firstInbound && (!hasDraft || detail.draft?.status === "rejected") && (
+                  <div style={{
+                    padding: "10px 14px",
+                    background: "#FFFFFF",
+                    border: "1px dashed #DBEAFE",
+                    borderRadius: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    marginBottom: 16,
+                  }}>
+                    <span style={{ fontSize: 12, color: "#9CA3AF", flex: 1 }}>
+                      {detail.draft?.status === "rejected" ? "Generate a new draft reply" : "No draft yet — let Clyde draft a reply"}
+                    </span>
+                    <GenerateDraftForm
+                      messageId={firstInbound.id}
+                      classificationId={detail.classification?.id}
+                      loadId={detail.matchedLoad?.id}
+                      threadId={selectedThread.id}
+                    />
+                  </div>
+                )}
+
+              </div>
+            </div>
+          </>
+        ) : !isLoading ? (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#C4C4C4", fontSize: 13 }}>
+            Select a thread to begin
+          </div>
+        ) : null}
+      </div>
+
+      {/* ── Right: context panel (toggle with \ or button) ──────────────── */}
+      {rightOpen && selectedThread && detail && (
+        <div style={{ width: 296, minWidth: 296, borderLeft: "1px solid #EBEBEB", display: "flex", flexDirection: "column", overflow: "hidden", background: "#FFFFFF" }}>
+          <RightContextPanel
+            matchedLoad={detail.matchedLoad}
+            classification={detail.classification}
+            appliedSops={detail.appliedSops}
+            loadDocs={detail.loadDocs}
+            timeline={detail.timeline}
+            threadId={selectedThread.id}
+            currentStatus={selectedThread.status as Parameters<typeof RightContextPanel>[0]["currentStatus"]}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
