@@ -307,6 +307,23 @@ export const sopRules = pgTable(
   ],
 );
 
+// ─── API Keys (for TMS / CRM integrations) ──────────────────────────────────
+// Key shown once at creation; only the SHA-256 hash is stored.
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    keyHash: text("key_hash").notNull().unique(),
+    keyPrefix: text("key_prefix").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    createdAt,
+  },
+  (t) => [index("api_keys_tenant_id_idx").on(t.tenantId)],
+);
+
 // Relations
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   users: many(users),
@@ -314,6 +331,7 @@ export const tenantsRelations = relations(tenants, ({ many }) => ({
   emailThreads: many(emailThreads),
   loads: many(loads),
   sopRules: many(sopRules),
+  apiKeys: many(apiKeys),
   autopilotSettings: many(autopilotSettings),
   auditLogs: many(auditLogs),
   inboxConnections: many(inboxConnections),
