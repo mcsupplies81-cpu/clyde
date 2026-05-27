@@ -60,7 +60,7 @@ export function ApiKeySection({
       {newKey && (
         <div style={{ margin: "10px 0", padding: "12px 14px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#15803D", marginBottom: 6 }}>
-            ✓ Key generated for &quot;{newKey.name}&quot; — copy it now, it won&apos;t be shown again
+            ✓ Key generated for &quot;{newKey.name}&quot; - copy it now, it won&apos;t be shown again
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <code style={{ ...codeStyle, fontSize: 12, padding: "6px 10px", flex: 1, userSelect: "all" as const }}>
@@ -86,7 +86,7 @@ export function ApiKeySection({
         <form action={createFormAction} style={{ ...rowStyle, flexDirection: "column" as const, alignItems: "stretch", gap: 8 }}>
           <input
             name="keyName"
-            placeholder='Key name — e.g. "Rose Rocket" or "Production"'
+            placeholder='Key name, e.g. "Rose Rocket" or "Production"'
             required
             autoFocus
             style={inputStyle}

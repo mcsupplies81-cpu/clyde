@@ -4,7 +4,7 @@ import { db } from "@/db";
 import {
   emailThreads, emailMessages, loads,
   aiClassifications, aiDrafts, auditLogs, sopRules,
-  inboxConnections, inboxes,
+  inboxConnections, inboxes, emailAttachments, loadDocuments,
 } from "@/db/schema";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -388,6 +388,55 @@ export async function resolveThreadAction(formData: FormData) {
     action: "thread_resolved", metadata: {},
   });
   revalidatePath("/app/inbox");
+}
+
+// ─── Save email attachment to load documents ───────────────────────────────────
+// Lets brokers capture a BOL/POD that arrived via email into the load's doc list.
+
+export async function saveAttachmentToLoadAction(
+  _prevState: { success?: boolean; error?: string } | undefined,
+  formData: FormData,
+): Promise<{ success?: boolean; error?: string }> {
+  const tenantId    = await getTenantId();
+  const attachmentId = String(formData.get("attachmentId") ?? "");
+  const loadId       = String(formData.get("loadId") ?? "");
+  if (!attachmentId || !loadId) return { error: "Missing params" };
+
+  const att = await db.query.emailAttachments.findFirst({
+    where: eq(emailAttachments.id, attachmentId),
+  });
+  if (!att) return { error: "Attachment not found" };
+
+  const load = await db.query.loads.findFirst({
+    where: and(eq(loads.id, loadId), eq(loads.tenantId, tenantId)),
+    columns: { id: true, loadNumber: true },
+  });
+  if (!load) return { error: "Load not found" };
+
+  // Idempotent: skip if already saved by file name
+  const existing = await db.query.loadDocuments.findFirst({
+    where: and(eq(loadDocuments.loadId, loadId), eq(loadDocuments.fileName, att.fileName)),
+  });
+  if (existing) return { error: "Already saved to this load" };
+
+  await db.insert(loadDocuments).values({
+    tenantId,
+    loadId,
+    documentType: att.documentType ?? "Other",
+    fileName: att.fileName,
+    fileUrl: att.fileUrl ?? "",
+  });
+
+  await db.insert(auditLogs).values({
+    tenantId, actorType: "user", actorName: "Marcus Webb",
+    entityType: "load", entityId: loadId,
+    action: "document_saved_from_email",
+    metadata: { attachmentId, documentType: att.documentType, fileName: att.fileName, loadId },
+  });
+
+  revalidatePath(`/app/loads/${loadId}`);
+  revalidatePath("/app/inbox");
+  return { success: true };
 }
 
 // ─── Manual reply ─────────────────────────────────────────────────────────────
@@ -823,7 +872,7 @@ export async function sendDraftViaGmailAction(
   const thread = await db.query.emailThreads.findFirst({ where: eq(emailThreads.id, threadId) });
   if (!thread) return { error: "Thread not found" };
   if (thread.status === "sent" || thread.status === "resolved") return { error: "Thread is already closed for sending" };
-  if (!thread.gmailThreadId) return { error: "Thread not connected to Gmail — use manual send" };
+  if (!thread.gmailThreadId) return { error: "Thread not connected to Gmail. Use manual send." };
 
   const { asc } = await import("drizzle-orm");
   const messages = await db.query.emailMessages.findMany({ where: eq(emailMessages.threadId, threadId), orderBy: [asc(emailMessages.receivedAt)] });
@@ -835,7 +884,7 @@ export async function sendDraftViaGmailAction(
     return { error: "Manual send required for this category" };
   }
   if (classification?.confidence !== null && classification?.confidence !== undefined && Number(classification.confidence) < 0.7) {
-    return { error: "Low confidence — please review before sending" };
+    return { error: "Low confidence - please review before sending" };
   }
 
   const draft = await db.query.aiDrafts.findFirst({ where: and(eq(aiDrafts.id, draftId), eq(aiDrafts.messageId, firstInbound.id)) });

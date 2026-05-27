@@ -45,7 +45,7 @@ export function ChaseAllDocsButton({
         border: "1px solid #BBF7D0",
         padding: "3px 12px", borderRadius: 4,
       }}>
-        ✓ {result.mode === "dry-run" ? "Drafted (dry run)" : `Sent — ${missingDocs.length} doc${missingDocs.length > 1 ? "s" : ""} requested`}
+        ✓ {result.mode === "dry-run" ? "Drafted (dry run)" : `Sent - ${missingDocs.length} doc${missingDocs.length > 1 ? "s" : ""} requested`}
       </span>
     );
   }
@@ -79,7 +79,7 @@ export function ChaseAllDocsButton({
       width: "100%",
     }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: "#1D4ED8", marginBottom: 6 }}>
-        Chase All Missing Docs — Load #{loadNumber}
+        Chase All Missing Docs: Load #{loadNumber}
       </div>
       <div style={{ fontSize: 11, color: "#3B82F6", marginBottom: 10 }}>
         {missingDocs.join(", ")}

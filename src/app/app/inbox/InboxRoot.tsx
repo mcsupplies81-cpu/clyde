@@ -9,6 +9,7 @@ import { relativeTime } from "@/lib/format";
 import {
   ClassifyForm, CopyButton, DraftActions, GenerateDraftForm,
   MarkSentForm, ResolveThreadForm, ShortcutHint, ManualReplyComposer,
+  SaveAttachmentButton,
 } from "./InboxActions";
 import { RightContextPanel } from "./components/RightContextPanel";
 import { LoadContextCard } from "./components/LoadContextCard";
@@ -650,12 +651,24 @@ export function InboxRoot({
                                     )}
                                   </span>
                                 );
-                                return att.fileUrl ? (
-                                  <a key={att.id} href={att.fileUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                                    {inner}
-                                  </a>
-                                ) : (
-                                  <span key={att.id}>{inner}</span>
+                                return (
+                                  <div key={att.id} style={{ display: "inline-flex", flexDirection: "column", gap: 3, alignItems: "flex-start" }}>
+                                    {att.fileUrl ? (
+                                      <a href={att.fileUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                                        {inner}
+                                      </a>
+                                    ) : (
+                                      <span>{inner}</span>
+                                    )}
+                                    {/* Save to load button — only when a load is matched */}
+                                    {detail.matchedLoad && (
+                                      <SaveAttachmentButton
+                                        attachmentId={att.id}
+                                        loadId={detail.matchedLoad.id}
+                                        fileName={att.fileName}
+                                      />
+                                    )}
+                                  </div>
                                 );
                               })}
                             </div>
@@ -775,7 +788,7 @@ export function InboxRoot({
                     gap: 12,
                   }}>
                     <span style={{ fontSize: 12, color: "#16A34A", fontWeight: 500 }}>
-                      ✓ Reply sent — resolve when fully handled
+                      ✓ Reply sent - resolve when fully handled
                     </span>
                     <ResolveThreadForm threadId={selectedThread.id} />
                   </div>
@@ -794,7 +807,7 @@ export function InboxRoot({
                     marginBottom: 12,
                   }}>
                     <span style={{ fontSize: 12, color: "#9CA3AF", flex: 1 }}>
-                      {detail.draft?.status === "rejected" ? "Generate a new draft reply" : "No draft yet — let Clyde draft a reply"}
+                      {detail.draft?.status === "rejected" ? "Generate a new draft reply" : "No draft yet. Let Clyde draft a reply."}
                     </span>
                     <GenerateDraftForm
                       messageId={firstInbound.id}

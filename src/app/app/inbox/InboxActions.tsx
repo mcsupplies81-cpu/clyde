@@ -15,6 +15,7 @@ import {
   sendDraftViaGmailAction,
   demoSendDraftAction,
   sendManualReplyAction,
+  saveAttachmentToLoadAction,
 } from "./actions";
 
 function SubmitButton({
@@ -120,9 +121,9 @@ export function GenerateDraftForm({
 const BLOCKED_SEND_CATEGORIES = new Set(["detention_accessorial", "billing_invoice", "escalation", "unknown", "quote_request", "carrier_concern"]);
 
 const BLOCKED_REASON: Record<string, string> = {
-  detention_accessorial: "Detention & accessorial charges require human review before any response.",
+  detention_accessorial: "Detention and accessorial charges require human review before any response.",
   billing_invoice: "Billing disputes must be reviewed by your billing team before replying.",
-  escalation: "Escalations require a direct human response — not an auto-draft.",
+  escalation: "Escalations require a direct human response.",
   quote_request: "Quotes need pricing review before sending.",
   carrier_concern: "Re-brokering and carrier compliance issues require human approval.",
   unknown: "Unclassified emails should be reviewed before sending.",
@@ -250,7 +251,7 @@ export function DraftActions({
             <div style={{ width: "100%", marginTop: 6 }}>
               <span style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 600 }}>Manual send required</span>
               {category && BLOCKED_REASON[category] && (
-                <span style={{ fontSize: 11, color: "#C4C4C4", marginLeft: 6 }}>— {BLOCKED_REASON[category]}</span>
+                <span style={{ fontSize: 11, color: "#C4C4C4", marginLeft: 6 }}>: {BLOCKED_REASON[category]}</span>
               )}
             </div>
           )}
@@ -463,6 +464,44 @@ export function KeyboardNav({
   }, [navigate, canGenerate, canApprove, canMarkSent, canResolve]);
 
   return null;
+}
+
+// ─── Save email attachment to load ────────────────────────────────────────────
+
+export function SaveAttachmentButton({
+  attachmentId,
+  loadId,
+  fileName,
+}: {
+  attachmentId: string;
+  loadId: string;
+  fileName: string;
+}) {
+  const [state, formAction, pending] = useActionState(saveAttachmentToLoadAction, undefined);
+  if (state?.success) {
+    return <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>✓ Saved to load</span>;
+  }
+  return (
+    <form action={formAction} style={{ display: "inline" }}>
+      <input type="hidden" name="attachmentId" value={attachmentId} />
+      <input type="hidden" name="loadId"       value={loadId} />
+      <button
+        type="submit"
+        disabled={pending}
+        title={`Save "${fileName}" to this load's document list`}
+        style={{
+          fontSize: 10, fontWeight: 600,
+          color: pending ? "#9CA3AF" : "#2563EB",
+          background: "none",
+          border: "1px solid #BFDBFE",
+          borderRadius: 3, padding: "1px 7px",
+          cursor: pending ? "default" : "pointer",
+        }}
+      >
+        {pending ? "Saving..." : state?.error ? `⚠ ${state.error}` : "📥 Save to load"}
+      </button>
+    </form>
+  );
 }
 
 // ─── Manual reply composer ────────────────────────────────────────────────────

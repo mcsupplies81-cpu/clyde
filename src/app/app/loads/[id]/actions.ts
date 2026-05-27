@@ -21,8 +21,8 @@ async function doChaseEmail(params: {
 }): Promise<{ sent: boolean; mode?: string; error?: string }> {
   const isMulti = params.docTypes.includes(",");
   const subject = isMulti
-    ? `Missing Documents — Load #${params.loadNumber}`
-    : `${params.docTypes} Request — Load #${params.loadNumber}`;
+    ? `Missing Documents: Load #${params.loadNumber}`
+    : `${params.docTypes} Request: Load #${params.loadNumber}`;
   return sendReply({ to: params.carrierEmail, from: params.fromEmail, fromName: params.fromName, subject, body: params.message });
 }
 
@@ -127,11 +127,12 @@ export async function chaseAllDocumentsAction(_prev: ChaseResult | null, formDat
   return { ok: true, mode: result.mode!, followUpId };
 }
 
-export async function cancelChaseFollowUpAction(followUpId: string): Promise<void> {
+export async function cancelChaseFollowUpAction(followUpId: string, loadId?: string): Promise<void> {
   const tenantId = await getTenantIdForUser();
   if (!tenantId) return;
   await db.update(chaseFollowUps)
     .set({ status: "cancelled" })
     .where(and(eq(chaseFollowUps.id, followUpId), eq(chaseFollowUps.tenantId, tenantId)));
+  if (loadId) revalidatePath(`/app/loads/${loadId}`);
   revalidatePath("/app/loads");
 }

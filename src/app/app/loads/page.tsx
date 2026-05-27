@@ -40,11 +40,11 @@ export default async function LoadsPage() {
         flexWrap: "wrap" as const,
       }}>
         <span style={{ fontSize: 11, color: "#9CA3AF" }}>
-          🔗 <strong style={{ color: "#5D5D5D" }}>Read-only mirror</strong> — load data lives in your TMS. Clyde reads it to give AI replies context.
+          🔗 <strong style={{ color: "#5D5D5D" }}>Read-only mirror</strong> - load data lives in your TMS. Clyde reads it to give AI replies context.
         </span>
         <span style={{ flex: 1 }} />
         {hasApiKey ? (
-          <span style={{ fontSize: 11, color: "#16A34A", fontWeight: 600 }}>✓ API key active — push updates via POST /api/v1/loads</span>
+          <span style={{ fontSize: 11, color: "#16A34A", fontWeight: 600 }}>✓ API key active - push updates via POST /api/v1/loads</span>
         ) : (
           <Link href="/app/settings" style={{ fontSize: 11, color: "#2563EB", fontWeight: 600, textDecoration: "none" }}>
             Generate API key to sync from TMS →
@@ -60,7 +60,7 @@ export default async function LoadsPage() {
               Active Loads
             </h1>
             <div style={{ color: "#9CA3AF", fontSize: 12, marginTop: 4 }}>
-              {allLoads.length} loads — context for AI email drafting
+              {allLoads.length} loads - context for AI email drafting
             </div>
           </div>
           <div style={{ display: "flex", gap: 10 }}>

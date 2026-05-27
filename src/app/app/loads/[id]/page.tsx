@@ -1,7 +1,7 @@
 import { getTenantIdForUser } from "@/lib/auth";
 import Link from "next/link";
 import { db } from "@/db";
-import { auditLogs, emailMessages, emailThreads, loadDocuments, loads, aiClassifications } from "@/db/schema";
+import { auditLogs, emailMessages, emailThreads, loadDocuments, loads, aiClassifications, chaseFollowUps } from "@/db/schema";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RiskBadge } from "@/components/RiskBadge";
 import { CategoryBadge } from "@/components/CategoryBadge";
@@ -54,7 +54,7 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
   const clsThreadIds = [...new Set(threadIdsFromCls.map((r) => r.threadId))];
 
   // Fetch all related data in parallel
-  const [docs, relatedThreadsRaw, loadAuditLogs] = await Promise.all([
+  const [docs, relatedThreadsRaw, loadAuditLogs, activeFollowUpsRaw] = await Promise.all([
     db.query.loadDocuments.findMany({
       where: and(eq(loadDocuments.loadId, load.id), eq(loadDocuments.tenantId, tenantId)),
       orderBy: [desc(loadDocuments.createdAt)],
@@ -76,8 +76,32 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
     db.select().from(auditLogs)
       .where(and(eq(auditLogs.tenantId, tenantId), eq(auditLogs.entityId, load.id)))
       .orderBy(desc(auditLogs.createdAt))
-      .limit(20),
+      .limit(30),
+    db.query.chaseFollowUps.findMany({
+      where: and(eq(chaseFollowUps.loadId, load.id), eq(chaseFollowUps.tenantId, tenantId)),
+    }),
   ]);
+
+  // Build last-chased-date per doc type from audit logs
+  const lastChaseByDoc: Record<string, Date> = {};
+  for (const log of loadAuditLogs) {
+    if (!["document_chased", "documents_chased"].includes(log.action)) continue;
+    const meta = log.metadata as { docType?: string; docTypes?: string[] } | null;
+    const types = meta?.docType ? [meta.docType] : (meta?.docTypes ?? []);
+    for (const dt of types) {
+      const logDate = new Date(log.createdAt);
+      if (!lastChaseByDoc[dt] || logDate > lastChaseByDoc[dt]) lastChaseByDoc[dt] = logDate;
+    }
+  }
+
+  // Build active follow-up per doc type
+  const activeFollowUpByDoc: Record<string, typeof activeFollowUpsRaw[0]> = {};
+  for (const fu of activeFollowUpsRaw) {
+    if (fu.status !== "active") continue;
+    for (const dt of fu.docTypes.split(",").map((d) => d.trim())) {
+      if (!activeFollowUpByDoc[dt]) activeFollowUpByDoc[dt] = fu;
+    }
+  }
 
   // Fetch thread classifications
   const relatedThreadIds = relatedThreadsRaw.map((t) => t.id);
@@ -185,7 +209,7 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#1D4ED8" }}>📄 BOL Missing</div>
             <div style={{ fontSize: 11, color: "#3B82F6", marginTop: 2 }}>
-              Load is {load.currentStatus} — the BOL should be on file before delivery.
+              Load is {load.currentStatus}. BOL should be on file before delivery.
             </div>
           </div>
           <ChaseDocumentButton
@@ -194,6 +218,14 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
             docType="BOL"
             carrierName={load.carrierName}
             defaultCarrierEmail={carrierEmail}
+            lastChasedAt={lastChaseByDoc["BOL"]?.toISOString() ?? null}
+            activeFollowUp={activeFollowUpByDoc["BOL"] ? {
+              id: activeFollowUpByDoc["BOL"].id,
+              sendCount: activeFollowUpByDoc["BOL"].sendCount,
+              maxSends: activeFollowUpByDoc["BOL"].maxSends,
+              nextSendAt: new Date(activeFollowUpByDoc["BOL"].nextSendAt).toISOString(),
+              messageTemplate: activeFollowUpByDoc["BOL"].messageTemplate,
+            } : null}
           />
         </div>
       )}
@@ -218,7 +250,7 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#92400E" }}>⚠ POD Missing</div>
             <div style={{ fontSize: 11, color: "#B45309", marginTop: 2 }}>
-              Load is {load.currentStatus} — chase carrier for proof of delivery to unblock billing.
+              Load is {load.currentStatus}. Chase carrier for proof of delivery to unblock billing.
             </div>
           </div>
           <ChaseDocumentButton
@@ -227,6 +259,14 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
             docType="POD"
             carrierName={load.carrierName}
             defaultCarrierEmail={carrierEmail}
+            lastChasedAt={lastChaseByDoc["POD"]?.toISOString() ?? null}
+            activeFollowUp={activeFollowUpByDoc["POD"] ? {
+              id: activeFollowUpByDoc["POD"].id,
+              sendCount: activeFollowUpByDoc["POD"].sendCount,
+              maxSends: activeFollowUpByDoc["POD"].maxSends,
+              nextSendAt: new Date(activeFollowUpByDoc["POD"].nextSendAt).toISOString(),
+              messageTemplate: activeFollowUpByDoc["POD"].messageTemplate,
+            } : null}
           />
         </div>
       )}
@@ -396,7 +436,7 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
                 {/* Individual chase per doc */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {missingDocs.length >= 2 && (
-                    <div style={{ fontSize: 10, color: "#C4C4C4", marginBottom: 2 }}>— or chase individually —</div>
+                    <div style={{ fontSize: 10, color: "#C4C4C4", marginBottom: 2 }}>or chase individually:</div>
                   )}
                   {missingDocs.map((dt) => (
                     <div key={dt}>
@@ -406,19 +446,35 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
                         justifyContent: "space-between",
                         gap: 8,
                         padding: "7px 10px",
-                        background: "#FFF7ED",
-                        border: "1px solid #FED7AA",
+                        background: lastChaseByDoc[dt] ? "#FFFBEB" : "#FFF7ED",
+                        border: `1px solid ${lastChaseByDoc[dt] ? "#FDE68A" : "#FED7AA"}`,
                         borderRadius: 5,
+                        flexWrap: "wrap",
                       }}>
-                        <span style={{ fontSize: 11, color: "#EA580C", fontWeight: 600 }}>
-                          ⚠ Missing: {dt}
-                        </span>
+                        <div>
+                          <span style={{ fontSize: 11, color: "#EA580C", fontWeight: 600 }}>
+                            ⚠ Missing: {dt}
+                          </span>
+                          {lastChaseByDoc[dt] && (
+                            <span style={{ fontSize: 10, color: "#9CA3AF", marginLeft: 8 }}>
+                              Last chased {Math.round((Date.now() - new Date(lastChaseByDoc[dt]).getTime()) / 86400000)}d ago
+                            </span>
+                          )}
+                        </div>
                         <ChaseDocumentButton
                           loadId={load.id}
                           loadNumber={load.loadNumber}
                           docType={dt}
                           carrierName={load.carrierName}
                           defaultCarrierEmail={carrierEmail}
+                          lastChasedAt={lastChaseByDoc[dt]?.toISOString() ?? null}
+                          activeFollowUp={activeFollowUpByDoc[dt] ? {
+                            id: activeFollowUpByDoc[dt].id,
+                            sendCount: activeFollowUpByDoc[dt].sendCount,
+                            maxSends: activeFollowUpByDoc[dt].maxSends,
+                            nextSendAt: new Date(activeFollowUpByDoc[dt].nextSendAt).toISOString(),
+                            messageTemplate: activeFollowUpByDoc[dt].messageTemplate,
+                          } : null}
                         />
                       </div>
                     </div>

@@ -23,7 +23,7 @@ export function AiSettingsClient() {
       <div style={rowStyle}>
         <div>
           <div style={labelStyle}>Auto-classify on arrival</div>
-          <div style={subtleStyle}>Local preview only — does not affect server behavior</div>
+          <div style={subtleStyle}>Local preview only - does not affect server behavior</div>
         </div>
         <button
           onClick={onToggle}

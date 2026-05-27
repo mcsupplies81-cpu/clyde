@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Clyde — Freight AI Inbox",
+  title: "Clyde | Freight AI Inbox",
   description: "AI-powered email operations for freight brokerages",
 };
 

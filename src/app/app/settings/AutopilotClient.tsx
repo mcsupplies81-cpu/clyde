@@ -22,7 +22,7 @@ export function AutopilotClient() {
       <div style={rowStyle}>
         <div>
           <div style={labelStyle}>Run autopilot now</div>
-          <div style={subtleStyle}>Processes all open threads — classify, draft, and send where safe</div>
+          <div style={subtleStyle}>Processes all open threads: classify, draft, and send where safe</div>
         </div>
         <button
           type="button"
@@ -84,7 +84,7 @@ export function AutopilotClient() {
       <div style={rowStyle}>
         <div>
           <div style={labelStyle}>Draft-only categories</div>
-          <div style={subtleStyle}>Classify → draft — human approval required before sending</div>
+          <div style={subtleStyle}>Classify + draft - human approval required before sending</div>
         </div>
         <div style={pillListStyle}>
           {["detention", "billing", "appointment", "quote"].map((c) => (
@@ -96,7 +96,7 @@ export function AutopilotClient() {
       <div style={rowStyle}>
         <div>
           <div style={labelStyle}>Classify-only categories</div>
-          <div style={subtleStyle}>Classified and flagged — no draft generated</div>
+          <div style={subtleStyle}>Classified and flagged - no draft generated</div>
         </div>
         <div style={pillListStyle}>
           {["escalation", "unknown"].map((c) => (
