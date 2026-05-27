@@ -134,29 +134,63 @@ export default async function SettingsPage() {
         </section>
 
         <section style={sectionStyle}>
-          <h2 style={sectionTitleStyle}>Gmail Integration</h2>
-          <div style={rowStyle}>
+          <h2 style={sectionTitleStyle}>Forwarding Inbox</h2>
+          <p style={{ margin: "0 0 14px", fontSize: 12, color: "#7F7F7F", lineHeight: 1.6 }}>
+            Forward any email to your unique Clyde address — works with Outlook, Gmail, or any email client.
+            Clyde will classify it, match it to a load, and draft a reply automatically.
+          </p>
+
+          {/* Inbound address */}
+          <div style={{ ...rowStyle, flexWrap: "wrap" as const, gap: 10 }}>
             <div>
-              <div style={labelStyle}>Connection status</div>
-              <div style={subtleStyle}>
-                {gmailConnection ? `Connected: ${gmailConnection.gmailEmail}` : "Not connected"}
-              </div>
+              <div style={labelStyle}>Your Clyde inbox address</div>
+              <div style={subtleStyle}>Set this as your forwarding destination</div>
             </div>
-            {gmailConnection ? (
-              <form action={disconnectGmail}>
-                <input type="hidden" name="tenantId" value={tenantId} />
-                <button type="submit" style={dangerButtonStyle}>Disconnect</button>
-              </form>
-            ) : (
-              <a href="/api/auth/gmail" style={buttonStyle}>Connect Gmail</a>
-            )}
-          </div>
-          <div style={rowStyle}>
-            <div style={labelStyle}>Last sync</div>
-            <code style={codeStyle}>
-              {gmailConnection?.lastSyncAt ? new Date(gmailConnection.lastSyncAt).toLocaleString() : "Never"}
+            <code style={{ ...codeStyle, fontSize: 12, background: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE", padding: "6px 12px" }}>
+              {demoInbox?.emailAddress ?? "—"}
             </code>
           </div>
+
+          {/* Setup steps */}
+          <div style={{ borderTop: "1px solid #F2F2F2", paddingTop: 14, marginTop: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: 10 }}>
+              Setup (30 seconds)
+            </div>
+            <div style={{ display: "flex", flexDirection: "column" as const, gap: 8 }}>
+              {[
+                { step: "1", label: "Outlook", detail: "Settings → Mail → Forwarding → Add forwarding address above" },
+                { step: "2", label: "Gmail", detail: "Settings → Forwarding and POP/IMAP → Add a forwarding address" },
+                { step: "3", label: "Any client", detail: "Set up an auto-forward rule: From = anyone, To = your ops address, Forward to Clyde" },
+              ].map(({ step, label, detail }) => (
+                <div key={step} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#EFF6FF", border: "1px solid #BFDBFE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#2563EB", flexShrink: 0, marginTop: 1 }}>{step}</div>
+                  <div>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "#292929" }}>{label}: </span>
+                    <span style={{ fontSize: 12, color: "#7F7F7F" }}>{detail}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Webhook info */}
+          <details style={{ borderTop: "1px solid #F2F2F2", paddingTop: 10, marginTop: 10 }}>
+            <summary style={{ cursor: "pointer", fontSize: 12, color: "#2563EB", fontWeight: 600, userSelect: "none" as const }}>
+              Developer: webhook endpoint ↓
+            </summary>
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11, color: "#7F7F7F", marginBottom: 6 }}>
+                Using Postmark, Mailgun, or SendGrid inbound parse? POST to:
+              </div>
+              <code style={{ ...codeStyle, fontSize: 11, display: "block", padding: "8px 12px" }}>
+                POST {baseUrl}/api/webhooks/inbound-email
+              </code>
+              <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 6 }}>
+                Set header <code>x-webhook-secret</code> = <code>INBOUND_WEBHOOK_SECRET</code> env var.
+                Postmark inbound format supported out of the box.
+              </div>
+            </div>
+          </details>
         </section>
 
         {/* TMS / CRM Integration API */}
