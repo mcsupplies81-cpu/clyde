@@ -202,18 +202,20 @@ export function InboxRoot({
     <div style={{ display: "flex", height: "100%", overflow: "hidden", background: "#FAFAF8" }}>
 
       {/* ── Left: thread list ───────────────────────────────────────────── */}
-      <div style={{ width: 272, minWidth: 272, borderRight: "1px solid #EBEBEB", display: "flex", flexDirection: "column", overflow: "hidden", background: "#FFFFFF" }}>
+      <div style={{ width: 300, minWidth: 300, borderRight: "1px solid #EBEBEB", display: "flex", flexDirection: "column", overflow: "hidden", background: "#FFFFFF" }}>
 
         {/* Header */}
         <div style={{ borderBottom: "1px solid #EBEBEB", flexShrink: 0 }}>
-          <div style={{ padding: "11px 14px 9px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#292929", letterSpacing: "-0.2px" }}>
-              Inbox
-            </span>
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <span style={{ fontSize: 10, color: "#9CA3AF", background: "#F5F5F5", padding: "1px 6px", borderRadius: 8, fontWeight: 600 }}>
+          <div style={{ padding: "12px 14px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "#111827", letterSpacing: "-0.3px" }}>
+                Inbox
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 400, color: "#9CA3AF" }}>
                 {threads.length}
               </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
               {connection && <SyncButton />}
             </div>
           </div>
@@ -266,6 +268,7 @@ export function InboxRoot({
             const dotColor = STATUS_DOT[wState] ?? STATUS_DOT[t.status] ?? "#D1D5DB";
             const isUrgent = t.priority === "urgent";
             const isUnread = ["open", "pending_review"].includes(t.status);
+            const sender = t.customerName ?? t.carrierName ?? "—";
 
             return (
               <button
@@ -275,58 +278,80 @@ export function InboxRoot({
                 style={{ display: "block", width: "100%", textAlign: "left", border: "none", padding: 0, background: "none", cursor: "pointer" }}
               >
                 <div style={{
-                  padding: "10px 14px 10px 12px",
-                  borderBottom: "1px solid #F2F2F2",
+                  padding: "9px 12px 9px 10px",
+                  borderBottom: "1px solid #F4F4F4",
                   background: active ? "#EFF6FF" : "transparent",
                   borderLeft: `3px solid ${active ? "#2563EB" : isUrgent ? PRIORITY_COLOR.urgent : "transparent"}`,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
                 }}>
-                  {/* Row 1: subject + timestamp */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, marginBottom: 3 }}>
-                    <div style={{
-                      fontSize: 13,
-                      fontWeight: isUnread || active ? 600 : 400,
-                      color: active ? "#1D4ED8" : isUnread ? "#111827" : "#5D5D5D",
-                      lineHeight: 1.35,
-                      overflow: "hidden",
-                      display: "-webkit-box",
-                      WebkitLineClamp: 1,
-                      WebkitBoxOrient: "vertical" as const,
-                      flex: 1,
-                    }}>
-                      {/* Unread dot inline */}
-                      {isUnread && !active && (
-                        <span style={{
-                          display: "inline-block",
-                          width: 6, height: 6, borderRadius: "50%",
-                          background: dotColor,
-                          marginRight: 6, marginBottom: 1,
-                          verticalAlign: "middle",
-                          flexShrink: 0,
-                        }} />
-                      )}
-                      {t.subject}
-                    </div>
-                    <span style={{ fontSize: 10, color: "#B0B0B0", whiteSpace: "nowrap", flexShrink: 0, marginTop: 1 }}>
-                      {relativeTime(t.lastMessageAt)}
-                    </span>
-                  </div>
+                  {/* Unread dot */}
+                  <div style={{
+                    width: 6, height: 6, borderRadius: "50%",
+                    background: isUnread && !active ? dotColor : "transparent",
+                    flexShrink: 0,
+                  }} />
 
-                  {/* Row 2: sender + load ref */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: cls ? 5 : 0 }}>
-                    <span style={{ fontSize: 11, color: "#7F7F7F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                      {t.customerName ?? t.carrierName ?? "—"}
-                    </span>
-                    {cls?.extractedLoadNumber && (
-                      <span style={{ fontSize: 10, color: "#93C5FD", fontFamily: "monospace", whiteSpace: "nowrap", flexShrink: 0 }}>
-                        #{cls.extractedLoadNumber}
+                  {/* Main content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* Single row: sender · subject · time */}
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 0 }}>
+                      {/* Sender */}
+                      <span style={{
+                        fontSize: 12,
+                        fontWeight: isUnread || active ? 700 : 400,
+                        color: active ? "#1D4ED8" : isUnread ? "#111827" : "#6B7280",
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
+                        maxWidth: 110,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}>
+                        {sender}
                       </span>
+
+                      {/* Separator */}
+                      <span style={{ color: "#D1D5DB", fontSize: 11, margin: "0 5px", flexShrink: 0 }}>·</span>
+
+                      {/* Subject */}
+                      <span style={{
+                        fontSize: 12,
+                        fontWeight: isUnread || active ? 500 : 400,
+                        color: active ? "#2563EB" : isUnread ? "#374151" : "#9CA3AF",
+                        flex: 1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}>
+                        {t.subject}
+                        {cls?.extractedLoadNumber && (
+                          <span style={{ color: "#93C5FD", marginLeft: 5, fontFamily: "monospace", fontSize: 11 }}>
+                            #{cls.extractedLoadNumber}
+                          </span>
+                        )}
+                      </span>
+
+                      {/* Time */}
+                      <span style={{
+                        fontSize: 10,
+                        color: isUnread && !active ? "#6B7280" : "#C4C4C4",
+                        fontWeight: isUnread && !active ? 500 : 400,
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
+                        marginLeft: 6,
+                      }}>
+                        {relativeTime(t.lastMessageAt)}
+                      </span>
+                    </div>
+
+                    {/* Category badge — only if classified */}
+                    {cls && (
+                      <div style={{ marginTop: 3 }}>
+                        <CategoryBadge category={cls.category} />
+                      </div>
                     )}
                   </div>
-
-                  {/* Row 3: category badge */}
-                  {cls && (
-                    <CategoryBadge category={cls.category} />
-                  )}
                 </div>
               </button>
             );
