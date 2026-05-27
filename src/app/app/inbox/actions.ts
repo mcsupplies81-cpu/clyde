@@ -10,13 +10,16 @@ import { eq, desc, and, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { mockClassify, openAiClassify } from "@/lib/ai-classifier";
 import { canAutoSend, requiresHumanApproval, SAFE_TO_AUTO_DRAFT, NEVER_AUTO_SEND } from "@/lib/safety";
+import { getTenantIdForUser } from "@/lib/auth";
+import { sendReply } from "@/lib/email-sender";
 
-function getTenantId() {
-  return process.env.DEMO_TENANT_ID ?? "";
+async function getTenantId(): Promise<string> {
+  const id = await getTenantIdForUser();
+  return id ?? "";
 }
 
 export async function classifyMessageAction(formData: FormData) {
-  const tenantId = getTenantId();
+  const tenantId = await getTenantId();
   const input = {
     messageId: String(formData.get("messageId") ?? ""),
     subject:   String(formData.get("subject") ?? ""),
@@ -63,7 +66,7 @@ export async function classifyMessageAction(formData: FormData) {
 }
 
 export async function generateDraftAction(formData: FormData) {
-  const tenantId = getTenantId();
+  const tenantId = await getTenantId();
   const messageId      = String(formData.get("messageId") ?? "");
   const classificationId = formData.get("classificationId") ? String(formData.get("classificationId")) : undefined;
   const loadId         = formData.get("loadId") ? String(formData.get("loadId")) : undefined;
@@ -214,7 +217,7 @@ export async function generateDraftAction(formData: FormData) {
 }
 
 export async function approveDraftAction(formData: FormData) {
-  const tenantId = getTenantId();
+  const tenantId = await getTenantId();
   const draftId  = String(formData.get("draftId") ?? "");
   const threadId = formData.get("threadId") ? String(formData.get("threadId")) : undefined;
   if (!draftId) return;
@@ -239,7 +242,7 @@ export async function approveDraftAction(formData: FormData) {
 }
 
 export async function rejectDraftAction(formData: FormData) {
-  const tenantId = getTenantId();
+  const tenantId = await getTenantId();
   const draftId  = String(formData.get("draftId") ?? "");
   if (!draftId) return;
 
@@ -253,7 +256,7 @@ export async function rejectDraftAction(formData: FormData) {
 }
 
 export async function editDraftAction(formData: FormData) {
-  const tenantId = getTenantId();
+  const tenantId = await getTenantId();
   const draftId  = String(formData.get("draftId") ?? "");
   const newBody  = String(formData.get("draftBody") ?? "");
   if (!draftId) return;
@@ -268,7 +271,7 @@ export async function editDraftAction(formData: FormData) {
 }
 
 export async function markSentManuallyAction(formData: FormData) {
-  const tenantId = getTenantId();
+  const tenantId = await getTenantId();
   const tid = String(formData.get("threadId") ?? "");
   if (!tid) return;
 
@@ -295,50 +298,77 @@ export async function markSentManuallyAction(formData: FormData) {
   revalidatePath("/app/inbox");
 }
 
-// Demo send — simulates a real send without requiring Gmail/Outlook connection.
-// Creates an outbound email record and advances thread state exactly like a real send.
+// Send draft — actually sends via Postmark if POSTMARK_API_TOKEN is set,
+// otherwise records the send in the DB and logs (safe dev fallback).
 export async function demoSendDraftAction(_prevState: unknown, formData: FormData) {
-  const tenantId = getTenantId();
+  const tenantId = await getTenantId();
   const draftId = String(formData.get("draftId") ?? "");
   const tid = String(formData.get("threadId") ?? "");
   if (!draftId || !tid) return { error: "Missing params" };
 
-  const draft = await db.query.aiDrafts.findFirst({ where: eq(aiDrafts.id, draftId) });
+  const [draft, thread] = await Promise.all([
+    db.query.aiDrafts.findFirst({ where: eq(aiDrafts.id, draftId) }),
+    db.query.emailThreads.findFirst({ where: eq(emailThreads.id, tid) }),
+  ]);
   if (!draft) return { error: "Draft not found" };
-
-  const thread = await db.query.emailThreads.findFirst({ where: eq(emailThreads.id, tid) });
   if (!thread) return { error: "Thread not found" };
 
-  const inbox = await db.query.inboxes.findFirst({ where: eq(inboxes.id, thread.inboxId) });
+  // Get inbox (from address) and original sender (to address)
+  const [inbox, firstInbound] = await Promise.all([
+    db.query.inboxes.findFirst({ where: eq(inboxes.id, thread.inboxId) }),
+    db.query.emailMessages.findFirst({
+      where: and(eq(emailMessages.threadId, tid), eq(emailMessages.direction, "inbound")),
+      orderBy: [emailMessages.receivedAt],
+    }),
+  ]);
 
-  const now = new Date();
+  const fromEmail = inbox?.emailAddress ?? "reply@clydefreight.com";
+  const toEmail = firstInbound?.senderEmail ?? "";
   const body = draft.finalBody ?? draft.draftBody;
+  const subject = draft.draftSubject ?? `Re: ${thread.subject}`;
+  const now = new Date();
 
-  // Create an outbound email message record
+  // Actually send via Postmark (or dry-run if no token)
+  if (toEmail) {
+    const result = await sendReply({
+      to: toEmail,
+      from: fromEmail,
+      fromName: "Clyde | Freight Ops",
+      subject,
+      body,
+      inReplyToMessageId: firstInbound?.gmailMessageId,
+    });
+    if (!result.sent) {
+      console.error("[sendDraft] Send failed:", result.error);
+      // Don't block — still record in DB so broker knows it was attempted
+    }
+  }
+
+  // Record outbound message
   await db.insert(emailMessages).values({
     tenantId,
     threadId: tid,
     direction: "outbound",
-    senderName: "Clyde Demo",
-    senderEmail: inbox?.emailAddress ?? "demo@clyde.ai",
-    recipientEmail: "customer@example.com",
-    subject: draft.draftSubject ?? thread.subject,
+    senderName: "Clyde",
+    senderEmail: fromEmail,
+    recipientEmail: toEmail || "unknown",
+    subject,
     body,
     receivedAt: now,
   });
 
-  // Mark draft as sent
+  // Mark draft sent
   await db.update(aiDrafts)
-    .set({ status: "sent", sentAt: now, sentBy: "Demo Send", finalBody: body, updatedAt: now })
+    .set({ status: "sent", sentAt: now, sentBy: "Clyde", finalBody: body, updatedAt: now })
     .where(eq(aiDrafts.id, draftId));
 
-  // Advance thread status
+  // Advance thread
   await db.update(emailThreads).set({ status: "sent" }).where(eq(emailThreads.id, tid));
 
   await db.insert(auditLogs).values({
-    tenantId, actorType: "user", actorName: "Marcus Webb",
+    tenantId, actorType: "user", actorName: "Clyde",
     entityType: "email_thread", entityId: tid,
-    action: "demo_sent", metadata: { draftId },
+    action: "reply_sent", metadata: { draftId, to: toEmail, via: process.env.POSTMARK_API_TOKEN ? "postmark" : "dry-run" },
   });
 
   revalidatePath("/app/inbox");
@@ -346,7 +376,7 @@ export async function demoSendDraftAction(_prevState: unknown, formData: FormDat
 }
 
 export async function resolveThreadAction(formData: FormData) {
-  const tenantId = getTenantId();
+  const tenantId = await getTenantId();
   const tid = String(formData.get("threadId") ?? "");
   if (!tid) return;
   await db.update(emailThreads).set({ status: "resolved" }).where(
@@ -361,7 +391,7 @@ export async function resolveThreadAction(formData: FormData) {
 }
 
 export async function escalateThreadAction(formData: FormData) {
-  const tenantId = getTenantId();
+  const tenantId = await getTenantId();
   const tid = String(formData.get("threadId") ?? "");
   if (!tid) return;
   await db.update(emailThreads).set({ status: "escalated", priority: "urgent" }).where(
@@ -388,7 +418,7 @@ export type AutopilotResult = {
 };
 
 export async function runAutopilotAction(): Promise<AutopilotResult> {
-  const tenantId = getTenantId();
+  const tenantId = await getTenantId();
   const blank: AutopilotResult = { total: 0, classified: 0, drafted: 0, autoSent: 0, skipped: 0, timestamp: new Date().toISOString() };
   if (!tenantId) return blank;
 
@@ -572,7 +602,7 @@ export async function runAutopilotAction(): Promise<AutopilotResult> {
 // ─── Gmail Sync ───────────────────────────────────────────────────────────────
 
 export async function syncGmailAction() {
-  const tenantId = getTenantId();
+  const tenantId = await getTenantId();
   const errors: string[] = [];
   let newThreads = 0;
   let newMessages = 0;

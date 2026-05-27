@@ -14,6 +14,7 @@ type PostmarkInbound = {
   HtmlBody?: string;
   MessageID?: string;
   Date?: string;
+  Headers?: Array<{ Name: string; Value: string }>;
 };
 
 function cleanSubject(subject: string) {
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { From, FromName, To, Subject, TextBody, HtmlBody, MessageID, Date: msgDate } = payload;
+  const { From, FromName, To, Subject, TextBody, HtmlBody, MessageID, Date: msgDate, Headers } = payload;
   if (!From || !To) return NextResponse.json({ error: "Missing From/To" }, { status: 400 });
 
   // Match inbox by the To address
@@ -74,16 +75,36 @@ export async function POST(req: NextRequest) {
     if (dup) return NextResponse.json({ ok: true, skipped: "duplicate" });
   }
 
-  // Find or create thread — match by inbox + cleaned subject + sender
-  let thread = await db.query.emailThreads.findFirst({
-    where: and(
-      eq(emailThreads.tenantId, tenantId),
-      eq(emailThreads.inboxId, inbox.id),
-      ilike(emailThreads.subject, cleanedSubject),
-      eq(emailThreads.customerName, fromName),
-    ),
-    orderBy: [desc(emailThreads.lastMessageAt)],
-  });
+  // ── Thread matching ────────────────────────────────────────────────────────
+  // 1. In-Reply-To header — most reliable (reply to a Clyde-sent email)
+  const inReplyTo = Headers?.find((h) => h.Name === "In-Reply-To")?.Value?.trim();
+  let thread = null;
+
+  if (inReplyTo) {
+    const parentMsg = await db.query.emailMessages.findFirst({
+      where: eq(emailMessages.gmailMessageId, inReplyTo),
+      columns: { threadId: true },
+    });
+    if (parentMsg) {
+      thread = await db.query.emailThreads.findFirst({
+        where: eq(emailThreads.id, parentMsg.threadId),
+      });
+      if (thread) console.log("[inbound-email] Linked reply via In-Reply-To to thread", thread.id);
+    }
+  }
+
+  // 2. Subject + sender match (fallback for forwarded email or first contact)
+  if (!thread) {
+    thread = await db.query.emailThreads.findFirst({
+      where: and(
+        eq(emailThreads.tenantId, tenantId),
+        eq(emailThreads.inboxId, inbox.id),
+        ilike(emailThreads.subject, cleanedSubject),
+        eq(emailThreads.customerName, fromName),
+      ),
+      orderBy: [desc(emailThreads.lastMessageAt)],
+    });
+  }
 
   if (!thread) {
     const [inserted] = await db.insert(emailThreads).values({

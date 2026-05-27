@@ -4,6 +4,7 @@ import { createHash, randomBytes } from "crypto";
 import { db } from "@/db";
 import { inboxConnections, inboxes, tenants, apiKeys } from "@/db/schema";
 import { and, asc, desc, eq } from "drizzle-orm";
+import { getTenantIdForUser } from "@/lib/auth";
 import { AiSettingsClient } from "./AiSettingsClient";
 import { AutopilotClient } from "./AutopilotClient";
 import { ApiKeySection } from "./ApiKeySection";
@@ -20,7 +21,7 @@ async function disconnectGmail(formData: FormData) {
 
 async function updateTenantName(formData: FormData) {
   "use server";
-  const tenantId = process.env.DEMO_TENANT_ID ?? "";
+  const tenantId = (await getTenantIdForUser()) ?? "";
   const name = String(formData.get("name") ?? "").trim();
   if (!tenantId || !name) return;
   await db.update(tenants).set({ name }).where(eq(tenants.id, tenantId));
@@ -29,7 +30,7 @@ async function updateTenantName(formData: FormData) {
 
 async function createApiKeyAction(_prev: unknown, formData: FormData) {
   "use server";
-  const tenantId = process.env.DEMO_TENANT_ID ?? "";
+  const tenantId = (await getTenantIdForUser()) ?? "";
   const name = String(formData.get("keyName") ?? "").trim();
   if (!tenantId || !name) return { error: "Missing name" };
 
@@ -44,7 +45,7 @@ async function createApiKeyAction(_prev: unknown, formData: FormData) {
 
 async function revokeApiKeyAction(_prev: unknown, formData: FormData) {
   "use server";
-  const tenantId = process.env.DEMO_TENANT_ID ?? "";
+  const tenantId = (await getTenantIdForUser()) ?? "";
   const keyId = String(formData.get("keyId") ?? "");
   if (!tenantId || !keyId) return { error: "Missing params" };
 
@@ -56,7 +57,7 @@ async function revokeApiKeyAction(_prev: unknown, formData: FormData) {
 }
 
 export default async function SettingsPage() {
-  const tenantId  = process.env.DEMO_TENANT_ID ?? "";
+  const tenantId = (await getTenantIdForUser()) ?? "";
   const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY);
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://clyde-app.vercel.app";
 

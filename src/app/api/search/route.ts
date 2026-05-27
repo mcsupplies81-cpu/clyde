@@ -1,3 +1,4 @@
+import { getTenantIdForUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { emailThreads, loads, aiClassifications, emailMessages } from "@/db/schema";
@@ -6,7 +7,7 @@ import { and, eq, ilike, or, desc } from "drizzle-orm";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const tenantId = process.env.DEMO_TENANT_ID ?? "";
+  const tenantId = await getTenantIdForUser();
   if (!tenantId) return NextResponse.json({ threads: [], loads: [] });
 
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";

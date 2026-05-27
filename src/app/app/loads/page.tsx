@@ -1,3 +1,4 @@
+import { getTenantIdForUser } from "@/lib/auth";
 import Link from "next/link";
 import { db } from "@/db";
 import { loads, apiKeys } from "@/db/schema";
@@ -5,7 +6,7 @@ import { and, eq, desc } from "drizzle-orm";
 import { LoadsTableClient } from "./LoadsTableClient";
 
 export default async function LoadsPage() {
-  const tenantId = process.env.DEMO_TENANT_ID ?? "";
+  const tenantId = await getTenantIdForUser();
 
   if (!tenantId) {
     return (

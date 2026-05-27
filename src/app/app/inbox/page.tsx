@@ -1,3 +1,4 @@
+import { getTenantIdForUser } from "@/lib/auth";
 import { unstable_cache } from "next/cache";
 import { db } from "@/db";
 import {
@@ -132,7 +133,7 @@ const getCachedThreadListData = unstable_cache(
 
 export default async function InboxPage({ searchParams }: { searchParams: Promise<{ threadId?: string; filter?: string }> }) {
   const { threadId, filter: rawFilter } = await searchParams;
-  const tenantId = process.env.DEMO_TENANT_ID ?? "";
+  const tenantId = await getTenantIdForUser();
 
   if (!tenantId) {
     return (

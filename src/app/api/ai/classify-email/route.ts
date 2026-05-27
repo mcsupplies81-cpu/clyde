@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { mockClassify, openAiClassify, type ClassifyInput } from "@/lib/ai-classifier";
 import { db } from "@/db";
 import { aiClassifications } from "@/db/schema";
+import { getTenantIdForUser } from "@/lib/auth";
 
 function validateInput(body: unknown): ClassifyInput {
   if (!body || typeof body !== "object") throw new Error("Invalid body");
@@ -15,7 +16,7 @@ function validateInput(body: unknown): ClassifyInput {
 export async function POST(request: Request) {
   try {
     const input = validateInput(await request.json());
-    const tenantId = process.env.DEMO_TENANT_ID ?? "";
+    const tenantId = (await getTenantIdForUser()) ?? "";
 
     const classification = process.env.OPENAI_API_KEY
       ? await openAiClassify(input)

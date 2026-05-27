@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { aiDrafts, emailMessages, aiClassifications, loads, sopRules } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { getTenantIdForUser } from "@/lib/auth";
 
 const SYSTEM_PROMPT = `You are Clyde, a freight operations AI assistant. Generate a professional draft reply for a freight brokerage operator.
 
@@ -19,7 +20,7 @@ Rules:
 export async function POST(request: Request) {
   try {
     const body = await request.json() as { messageId: string; classificationId?: string; loadId?: string };
-    const tenantId = process.env.DEMO_TENANT_ID ?? "";
+    const tenantId = (await getTenantIdForUser()) ?? "";
 
     const [message] = await db.select().from(emailMessages).where(eq(emailMessages.id, body.messageId)).limit(1);
     if (!message) return NextResponse.json({ error: "Message not found" }, { status: 404 });

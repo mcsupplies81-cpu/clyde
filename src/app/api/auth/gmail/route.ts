@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { getGmailAuthUrl } from "@/lib/gmail";
+import { getTenantIdForUser } from "@/lib/auth";
 
 export async function GET() {
-  const tenantId = process.env.DEMO_TENANT_ID ?? "";
+  const tenantId = await getTenantIdForUser();
   if (!tenantId) {
-    return NextResponse.json({ error: "DEMO_TENANT_ID is not configured" }, { status: 500 });
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
   return NextResponse.redirect(getGmailAuthUrl(tenantId));

@@ -3,9 +3,10 @@ import { TopBar } from "@/components/TopBar";
 import { db } from "@/db";
 import { emailThreads, inboxes, tenants } from "@/db/schema";
 import { and, asc, eq, notInArray } from "drizzle-orm";
+import { getTenantIdForUser } from "@/lib/auth";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const tenantId = process.env.DEMO_TENANT_ID ?? "";
+  const tenantId = await getTenantIdForUser();
 
   const [openCount, inbox, tenant] = await Promise.all([
     tenantId

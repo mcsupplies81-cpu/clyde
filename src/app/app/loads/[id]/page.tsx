@@ -1,3 +1,4 @@
+import { getTenantIdForUser } from "@/lib/auth";
 import Link from "next/link";
 import { db } from "@/db";
 import { auditLogs, emailMessages, emailThreads, loadDocuments, loads, aiClassifications } from "@/db/schema";
@@ -14,9 +15,9 @@ const STATUS_OPTIONS = ["Booked", "Dispatched", "At Pickup", "In Transit", "Out 
 
 export default async function LoadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const tenantId = process.env.DEMO_TENANT_ID ?? "";
+  const tenantId = await getTenantIdForUser();
 
-  if (!tenantId) return <div style={{ padding: 40, color: "#DC2626" }}>DEMO_TENANT_ID not set.</div>;
+  if (!tenantId) return <div style={{ padding: 40, color: "#DC2626" }}>Not authenticated.</div>;
 
   const load = await db.query.loads.findFirst({
     where: and(eq(loads.id, id), eq(loads.tenantId, tenantId)),
@@ -129,7 +130,7 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
   async function updateStatusAction(fd: FormData) {
     "use server";
     const newStatus = String(fd.get("status") ?? "").trim();
-    if (!newStatus) return;
+    if (!newStatus || !tenantId) return;
     await db.update(loads).set({ currentStatus: newStatus }).where(and(eq(loads.id, id), eq(loads.tenantId, tenantId)));
     const { auditLogs: auditLogsTable } = await import("@/db/schema");
     await db.insert(auditLogsTable).values({

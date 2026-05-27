@@ -5,14 +5,13 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { sopRules } from "@/db/schema";
 import { CATEGORIES } from "@/lib/ai-classifier";
-
-function getTenantId() { return process.env.DEMO_TENANT_ID ?? ""; }
+import { getTenantIdForUser } from "@/lib/auth";
 
 type Result = { ok?: boolean; error?: string };
 
 export async function createRuleAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const tenantId = getTenantId();
-  if (!tenantId) return { error: "DEMO_TENANT_ID not set" };
+  const tenantId = (await getTenantIdForUser()) ?? "";
+  if (!tenantId) return { error: "Not authenticated" };
   const name            = String(formData.get("name") ?? "").trim();
   const category        = String(formData.get("category") ?? "unknown").trim();
   const ruleText        = String(formData.get("ruleText") ?? "").trim();
@@ -24,8 +23,8 @@ export async function createRuleAction(_prev: Result | undefined, formData: Form
 }
 
 export async function updateRuleAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const tenantId = getTenantId();
-  if (!tenantId) return { error: "DEMO_TENANT_ID not set" };
+  const tenantId = (await getTenantIdForUser()) ?? "";
+  if (!tenantId) return { error: "Not authenticated" };
   const id              = String(formData.get("id") ?? "");
   const name            = String(formData.get("name") ?? "").trim();
   const category        = String(formData.get("category") ?? "unknown").trim();
@@ -38,7 +37,7 @@ export async function updateRuleAction(_prev: Result | undefined, formData: Form
 }
 
 export async function toggleRuleAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const tenantId = getTenantId();
+  const tenantId = (await getTenantIdForUser()) ?? "";
   const id       = String(formData.get("id") ?? "");
   const isActive = formData.get("isActive") === "true";
   if (!tenantId || !id) return { error: "Missing params" };
@@ -48,7 +47,7 @@ export async function toggleRuleAction(_prev: Result | undefined, formData: Form
 }
 
 export async function deleteRuleAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const tenantId = getTenantId();
+  const tenantId = (await getTenantIdForUser()) ?? "";
   const id       = String(formData.get("id") ?? "");
   if (!tenantId || !id) return { error: "Missing params" };
   await db.delete(sopRules).where(and(eq(sopRules.id, id), eq(sopRules.tenantId, tenantId)));

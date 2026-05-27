@@ -1,3 +1,4 @@
+import { getTenantIdForUser } from "@/lib/auth";
 import { db } from "@/db";
 import { aiClassifications, aiDrafts, auditLogs, emailMessages, emailThreads, loads } from "@/db/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
@@ -53,7 +54,7 @@ function MetricCard({ label, value, accent, subLabel }: { label: string; value: 
 }
 
 export default async function AnalyticsPage() {
-  const tenantId = process.env.DEMO_TENANT_ID ?? "";
+  const tenantId = await getTenantIdForUser();
 
   if (!tenantId) {
     return (
