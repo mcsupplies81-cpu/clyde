@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useActionState } from "react";
+import { useState, useEffect, useCallback, useActionState, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
@@ -14,6 +14,7 @@ import {
   resolveThreadAction,
   sendDraftViaGmailAction,
   demoSendDraftAction,
+  sendManualReplyAction,
 } from "./actions";
 
 function SubmitButton({
@@ -462,6 +463,164 @@ export function KeyboardNav({
   }, [navigate, canGenerate, canApprove, canMarkSent, canResolve]);
 
   return null;
+}
+
+// ─── Manual reply composer ────────────────────────────────────────────────────
+// Lets the broker write a reply directly — no AI draft needed.
+
+export function ManualReplyComposer({
+  threadId,
+  toEmail,
+  toName,
+  subject,
+}: {
+  threadId: string;
+  toEmail: string;
+  toName?: string | null;
+  subject: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [state, formAction, pending] = useActionState(sendManualReplyAction, undefined);
+
+  // Close on success + focus textarea on open
+  useEffect(() => {
+    if (state?.success) setOpen(false);
+  }, [state?.success]);
+
+  useEffect(() => {
+    if (open) setTimeout(() => textareaRef.current?.focus(), 50);
+  }, [open]);
+
+  const reSubject = subject.startsWith("Re:") || subject.startsWith("RE:") ? subject : `Re: ${subject}`;
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      {!open ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "8px 16px",
+              background: "#F5F5F5",
+              border: "1px solid #E8E8E8",
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#374151",
+              cursor: "pointer",
+            }}
+          >
+            ↩ Reply manually
+          </button>
+          {state?.success && (
+            <span style={{ fontSize: 12, color: "#16A34A", fontWeight: 500 }}>✓ Reply sent</span>
+          )}
+        </div>
+      ) : (
+        <div style={{
+          background: "#FFFFFF",
+          border: "1px solid #DBEAFE",
+          borderRadius: 8,
+          overflow: "hidden",
+          boxShadow: "0 2px 8px rgba(37, 99, 235, 0.08)",
+        }}>
+          {/* Composer header */}
+          <div style={{
+            padding: "8px 14px",
+            background: "#EFF6FF",
+            borderBottom: "1px solid #DBEAFE",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#2563EB" }}>↩ Reply</span>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#93C5FD", fontSize: 15, padding: "0 2px", lineHeight: 1 }}
+            >
+              ✕
+            </button>
+          </div>
+
+          <form action={formAction} style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+            <input type="hidden" name="threadId" value={threadId} />
+            <input type="hidden" name="to"       value={toEmail} />
+            <input type="hidden" name="subject"  value={reSubject} />
+
+            {/* To + subject meta */}
+            <div style={{ fontSize: 11, color: "#6B7280", borderBottom: "1px solid #F0F0F0", paddingBottom: 7 }}>
+              <span style={{ fontWeight: 600, marginRight: 5, color: "#9CA3AF" }}>To:</span>
+              <span style={{ color: "#374151" }}>{toName ?? toEmail}</span>
+              {toName && <span style={{ color: "#C4C4C4", marginLeft: 4 }}>&lt;{toEmail}&gt;</span>}
+            </div>
+
+            {/* Body */}
+            <textarea
+              ref={textareaRef}
+              name="body"
+              required
+              placeholder="Write your reply…"
+              rows={5}
+              style={{
+                width: "100%",
+                border: "none",
+                outline: "none",
+                fontSize: 13,
+                color: "#1A1A1A",
+                lineHeight: 1.8,
+                resize: "vertical",
+                background: "transparent",
+                padding: 0,
+                fontFamily: "inherit",
+              }}
+            />
+
+            {/* Action row */}
+            <div style={{ display: "flex", gap: 8, borderTop: "1px solid #F0F0F0", paddingTop: 8, alignItems: "center" }}>
+              <button
+                type="submit"
+                disabled={pending}
+                style={{
+                  padding: "7px 18px",
+                  background: pending ? "#9CA3AF" : "#2563EB",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: 5,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: pending ? "wait" : "pointer",
+                }}
+              >
+                {pending ? "Sending…" : "Send"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                style={{
+                  padding: "7px 14px",
+                  background: "transparent",
+                  color: "#9CA3AF",
+                  border: "1px solid #E8E8E8",
+                  borderRadius: 5,
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              {state?.error && (
+                <span style={{ fontSize: 11, color: "#DC2626", marginLeft: 4 }}>{state.error}</span>
+              )}
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Shortcuts hint ───────────────────────────────────────────────────────────

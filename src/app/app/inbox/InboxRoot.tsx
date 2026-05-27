@@ -8,7 +8,7 @@ import { deriveWorkflowState, WORKFLOW_LABEL } from "@/lib/workflow";
 import { relativeTime } from "@/lib/format";
 import {
   ClassifyForm, CopyButton, DraftActions, GenerateDraftForm,
-  MarkSentForm, ResolveThreadForm, ShortcutHint,
+  MarkSentForm, ResolveThreadForm, ShortcutHint, ManualReplyComposer,
 } from "./InboxActions";
 import { RightContextPanel } from "./components/RightContextPanel";
 import { LoadContextCard } from "./components/LoadContextCard";
@@ -791,7 +791,7 @@ export function InboxRoot({
                     display: "flex",
                     alignItems: "center",
                     gap: 12,
-                    marginBottom: 16,
+                    marginBottom: 12,
                   }}>
                     <span style={{ fontSize: 12, color: "#9CA3AF", flex: 1 }}>
                       {detail.draft?.status === "rejected" ? "Generate a new draft reply" : "No draft yet — let Clyde draft a reply"}
@@ -804,6 +804,20 @@ export function InboxRoot({
                     />
                   </div>
                 )}
+
+                {/* Manual reply composer — always available, skips AI draft */}
+                {(() => {
+                  const lastInbound = [...detail.messages].reverse().find((m) => m.direction === "inbound");
+                  if (!lastInbound) return null;
+                  return (
+                    <ManualReplyComposer
+                      threadId={selectedThread.id}
+                      toEmail={lastInbound.senderEmail}
+                      toName={lastInbound.senderName}
+                      subject={selectedThread.subject}
+                    />
+                  );
+                })()}
 
               </div>
             </div>

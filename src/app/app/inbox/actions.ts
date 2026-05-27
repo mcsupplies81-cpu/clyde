@@ -390,6 +390,76 @@ export async function resolveThreadAction(formData: FormData) {
   revalidatePath("/app/inbox");
 }
 
+// ─── Manual reply ─────────────────────────────────────────────────────────────
+// Broker types their own reply (skips the AI draft entirely).
+
+export async function sendManualReplyAction(
+  _prevState: { success?: boolean; error?: string } | undefined,
+  formData: FormData,
+): Promise<{ success?: boolean; error?: string }> {
+  const tenantId = await getTenantId();
+  const threadId = String(formData.get("threadId") ?? "");
+  const to       = String(formData.get("to") ?? "");
+  const body     = String(formData.get("body") ?? "").trim();
+  const subject  = String(formData.get("subject") ?? "");
+
+  if (!threadId || !to || !body) return { error: "Missing required fields" };
+
+  const thread = await db.query.emailThreads.findFirst({
+    where: and(eq(emailThreads.id, threadId), eq(emailThreads.tenantId, tenantId)),
+  });
+  if (!thread) return { error: "Thread not found" };
+
+  const inbox = await db.query.inboxes.findFirst({ where: eq(inboxes.id, thread.inboxId) });
+  const fromEmail = inbox?.emailAddress ?? "reply@clydefreight.com";
+
+  const firstInbound = await db.query.emailMessages.findFirst({
+    where: and(eq(emailMessages.threadId, threadId), eq(emailMessages.direction, "inbound")),
+    orderBy: [emailMessages.receivedAt],
+  });
+
+  // Attempt to send via Postmark (dry-run if no token)
+  const sendResult = await sendReply({
+    to,
+    from: fromEmail,
+    fromName: "Clyde | Freight Ops",
+    subject,
+    body,
+    inReplyToMessageId: firstInbound?.gmailMessageId,
+  });
+  if (!sendResult.sent) {
+    console.warn("[sendManualReply] Send failed:", sendResult.error);
+  }
+
+  const now = new Date();
+
+  await db.insert(emailMessages).values({
+    tenantId,
+    threadId,
+    direction: "outbound",
+    senderName: "Marcus Webb",
+    senderEmail: fromEmail,
+    recipientEmail: to,
+    subject,
+    body,
+    receivedAt: now,
+  });
+
+  await db.update(emailThreads)
+    .set({ status: "sent", lastMessageAt: now })
+    .where(and(eq(emailThreads.id, threadId), eq(emailThreads.tenantId, tenantId)));
+
+  await db.insert(auditLogs).values({
+    tenantId, actorType: "user", actorName: "Marcus Webb",
+    entityType: "email_thread", entityId: threadId,
+    action: "manual_reply_sent",
+    metadata: { to, subject, via: sendResult.sent ? "postmark" : "dry-run" },
+  });
+
+  revalidatePath("/app/inbox");
+  return { success: true };
+}
+
 export async function escalateThreadAction(formData: FormData) {
   const tenantId = await getTenantId();
   const tid = String(formData.get("threadId") ?? "");
