@@ -181,6 +181,26 @@ export const loadDocuments = pgTable(
   ],
 );
 
+export const emailAttachments = pgTable(
+  "email_attachments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    messageId: uuid("message_id").notNull().references(() => emailMessages.id, { onDelete: "cascade" }),
+    loadDocumentId: uuid("load_document_id"),        // set if successfully linked to a load
+    documentType: text("document_type").notNull(),   // POD, BOL, Rate Confirmation, etc.
+    fileName: text("file_name").notNull(),
+    fileUrl: text("file_url"),                        // Vercel Blob URL (null if storage not configured)
+    contentType: text("content_type"),
+    fileSizeBytes: integer("file_size_bytes"),
+    createdAt,
+  },
+  (t) => [
+    index("email_attachments_message_id_idx").on(t.messageId),
+    index("email_attachments_tenant_id_idx").on(t.tenantId),
+  ],
+);
+
 export const aiClassifications = pgTable(
   "ai_classifications",
   {
@@ -349,6 +369,12 @@ export const emailMessagesRelations = relations(emailMessages, ({ one, many }) =
   thread: one(emailThreads, { fields: [emailMessages.threadId], references: [emailThreads.id] }),
   classifications: many(aiClassifications),
   drafts: many(aiDrafts),
+  attachments: many(emailAttachments),
+}));
+
+export const emailAttachmentsRelations = relations(emailAttachments, ({ one }) => ({
+  tenant: one(tenants, { fields: [emailAttachments.tenantId], references: [tenants.id] }),
+  message: one(emailMessages, { fields: [emailAttachments.messageId], references: [emailMessages.id] }),
 }));
 
 export const loadsRelations = relations(loads, ({ one, many }) => ({

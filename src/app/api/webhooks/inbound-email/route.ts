@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { emailMessages, emailThreads, inboxes, aiClassifications, aiDrafts, auditLogs, sopRules, loads } from "@/db/schema";
+import { emailMessages, emailThreads, inboxes, aiClassifications, aiDrafts, auditLogs, sopRules, loads, loadDocuments, emailAttachments } from "@/db/schema";
 import { and, desc, eq, ilike } from "drizzle-orm";
 import { mockClassify, openAiClassify } from "@/lib/ai-classifier";
 import { canAutoSend, SAFE_TO_AUTO_DRAFT } from "@/lib/safety";
+import { classifyDocument } from "@/lib/document-classifier";
+
+type PostmarkAttachment = {
+  Name: string;
+  Content: string;        // base64
+  ContentType: string;
+  ContentLength: number;
+  ContentID?: string;
+};
 
 type PostmarkInbound = {
   From: string;
@@ -15,6 +24,7 @@ type PostmarkInbound = {
   MessageID?: string;
   Date?: string;
   Headers?: Array<{ Name: string; Value: string }>;
+  Attachments?: PostmarkAttachment[];
 };
 
 function cleanSubject(subject: string) {
@@ -45,7 +55,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { From, FromName, To, Subject, TextBody, HtmlBody, MessageID, Date: msgDate, Headers } = payload;
+  const { From, FromName, To, Subject, TextBody, HtmlBody, MessageID, Date: msgDate, Headers, Attachments } = payload;
   if (!From || !To) return NextResponse.json({ error: "Missing From/To" }, { status: 400 });
 
   // Match inbox by the To address
@@ -257,6 +267,86 @@ export async function POST(req: NextRequest) {
       action: isFullAuto ? "autopilot_auto_sent" : "draft_generated",
       metadata: { category: clsResult.category, isFullAuto },
     });
+  }
+
+  // ── Process attachments ───────────────────────────────────────────────────────
+  const attachmentList = Attachments ?? [];
+  const realAttachments = attachmentList.filter(
+    (a) => !a.ContentID && a.ContentLength > 0,  // skip inline images (ContentID = embedded)
+  );
+
+  if (realAttachments.length > 0) {
+    // Re-fetch the matched load in case we need it for loadDocuments
+    const matchedLoad = clsResult.extractedLoadNumber
+      ? await db.query.loads.findFirst({
+          where: and(eq(loads.loadNumber, clsResult.extractedLoadNumber), eq(loads.tenantId, tenantId)),
+          columns: { id: true, loadNumber: true },
+        })
+      : null;
+
+    for (const att of realAttachments) {
+      const docType = classifyDocument({ fileName: att.Name, contentType: att.ContentType });
+
+      // Upload to Vercel Blob if configured, otherwise skip file storage
+      let fileUrl: string | null = null;
+      const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+      if (blobToken) {
+        try {
+          const { put } = await import("@vercel/blob");
+          const blobPath = `attachments/${tenantId}/${thread.id}/${att.Name}`;
+          const buffer = Buffer.from(att.Content, "base64");
+          const blob = await put(blobPath, buffer, {
+            access: "public",
+            contentType: att.ContentType,
+            token: blobToken,
+          });
+          fileUrl = blob.url;
+        } catch (err) {
+          console.error("[inbound-email] Blob upload failed:", err);
+        }
+      }
+
+      // Record in email_attachments (always, even without fileUrl)
+      let loadDocId: string | null = null;
+      if (matchedLoad) {
+        // Also link to loadDocuments so the load detail page shows it
+        const [ldoc] = await db.insert(loadDocuments).values({
+          tenantId,
+          loadId: matchedLoad.id,
+          documentType: docType,
+          fileName: att.Name,
+          fileUrl: fileUrl ?? "",
+        }).returning({ id: loadDocuments.id });
+        loadDocId = ldoc?.id ?? null;
+      }
+
+      await db.insert(emailAttachments).values({
+        tenantId,
+        messageId: message.id,
+        loadDocumentId: loadDocId,
+        documentType: docType,
+        fileName: att.Name,
+        fileUrl,
+        contentType: att.ContentType,
+        fileSizeBytes: att.ContentLength,
+      });
+    }
+
+    // Log it
+    await db.insert(auditLogs).values({
+      tenantId, actorType: "system", actorName: "Inbound Webhook",
+      entityType: "email_message", entityId: message.id,
+      action: "attachments_received",
+      metadata: {
+        count: realAttachments.length,
+        files: realAttachments.map((a) => ({
+          name: a.Name,
+          type: classifyDocument({ fileName: a.Name, contentType: a.ContentType }),
+        })),
+      },
+    });
+
+    console.log(`[inbound-email] Processed ${realAttachments.length} attachment(s) on message ${message.id}`);
   }
 
   return NextResponse.json({ ok: true, threadId: thread.id, messageId: message.id, category: clsResult.category });

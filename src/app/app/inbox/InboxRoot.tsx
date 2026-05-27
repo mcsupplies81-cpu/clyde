@@ -12,6 +12,8 @@ import {
 } from "./InboxActions";
 import { RightContextPanel } from "./components/RightContextPanel";
 import { LoadContextCard } from "./components/LoadContextCard";
+import { DOC_ICON, DOC_COLOR } from "@/lib/document-classifier";
+import type { DocumentType } from "@/lib/document-classifier";
 import { SyncButton } from "./SyncButton";
 import type { ThreadDetail } from "@/lib/inbox-thread-detail";
 
@@ -522,6 +524,7 @@ export function InboxRoot({
                 <LoadContextCard
                   matchedLoad={detail.matchedLoad}
                   classification={detail.classification}
+                  docCount={detail.loadDocs.length}
                 />
 
                 {/* Messages */}
@@ -571,6 +574,53 @@ export function InboxRoot({
                         <div style={{ padding: "12px 14px" }}>
                           <p style={{ margin: 0, color: "#3D3D3D", fontSize: 13, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{msg.body}</p>
                         </div>
+
+                        {/* Attachment strip */}
+                        {(() => {
+                          const atts = detail.attachmentsByMessage?.[msg.id] ?? [];
+                          if (!atts.length) return null;
+                          return (
+                            <div style={{ padding: "0 14px 12px", display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {atts.map((att) => {
+                                const docType = att.documentType as DocumentType;
+                                const colors = DOC_COLOR[docType] ?? DOC_COLOR["Other"];
+                                const icon = DOC_ICON[docType] ?? "📎";
+                                const inner = (
+                                  <span style={{
+                                    display: "inline-flex", alignItems: "center", gap: 5,
+                                    background: colors.bg, color: colors.text,
+                                    border: `1px solid ${colors.border}`,
+                                    fontSize: 11, fontWeight: 600,
+                                    padding: "3px 9px", borderRadius: 5,
+                                    textDecoration: "none",
+                                    cursor: att.fileUrl ? "pointer" : "default",
+                                  }}>
+                                    <span>{icon}</span>
+                                    <span>{docType}</span>
+                                    <span style={{ fontWeight: 400, color: colors.text, opacity: 0.7 }}>
+                                      {att.fileName.length > 24 ? att.fileName.slice(0, 22) + "…" : att.fileName}
+                                    </span>
+                                    {att.fileSizeBytes && (
+                                      <span style={{ fontWeight: 400, opacity: 0.5 }}>
+                                        {att.fileSizeBytes > 1024 * 1024
+                                          ? `${(att.fileSizeBytes / 1024 / 1024).toFixed(1)}MB`
+                                          : `${Math.round(att.fileSizeBytes / 1024)}KB`}
+                                      </span>
+                                    )}
+                                  </span>
+                                );
+                                return att.fileUrl ? (
+                                  <a key={att.id} href={att.fileUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                                    {inner}
+                                  </a>
+                                ) : (
+                                  <span key={att.id}>{inner}</span>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+
                         {isInbound && (
                           <div style={{ padding: "0 14px 10px" }}>
                             <ClassifyForm

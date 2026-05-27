@@ -53,7 +53,7 @@ function RiskPill({ level }: { level: string | null | undefined }) {
 
 // ── Card when load IS matched ──────────────────────────────────────────────────
 
-function MatchedLoadCard({ load, confidence }: { load: Load; confidence: number }) {
+function MatchedLoadCard({ load, confidence, docCount }: { load: Load; confidence: number; docCount: number }) {
   const route =
     load.originCity && load.destinationCity
       ? `${load.originCity}, ${load.originState} → ${load.destinationCity}, ${load.destinationState}`
@@ -145,6 +145,19 @@ function MatchedLoadCard({ load, confidence }: { load: Load; confidence: number 
             Driver: <span style={{ fontWeight: 600, color: "#374151" }}>{load.driverName}</span>
           </span>
         )}
+
+        {/* Doc count */}
+        {docCount > 0 && (
+          <span style={{
+            marginLeft: "auto",
+            fontSize: 10, fontWeight: 600,
+            color: "#16A34A", background: "#F0FDF4",
+            border: "1px solid #BBF7D0",
+            padding: "2px 8px", borderRadius: 4,
+          }}>
+            📎 {docCount} doc{docCount > 1 ? "s" : ""} on file
+          </span>
+        )}
       </div>
     </div>
   );
@@ -187,13 +200,15 @@ function UnmatchedLoadCard({ loadNumber }: { loadNumber: string }) {
 export function LoadContextCard({
   matchedLoad,
   classification,
+  docCount = 0,
 }: {
   matchedLoad: Load | null;
   classification: Classification | null;
+  docCount?: number;
 }) {
   if (matchedLoad) {
     const confidence = Math.round(Number(classification?.confidence ?? 0.85) * 100);
-    return <MatchedLoadCard load={matchedLoad} confidence={confidence} />;
+    return <MatchedLoadCard load={matchedLoad} confidence={confidence} docCount={docCount} />;
   }
 
   if (classification?.extractedLoadNumber) {

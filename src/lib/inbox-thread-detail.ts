@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { emailMessages, aiClassifications, aiDrafts, sopRules, loadDocuments, auditLogs } from "@/db/schema";
+import { emailMessages, aiClassifications, aiDrafts, sopRules, loadDocuments, auditLogs, emailAttachments } from "@/db/schema";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { matchLoad } from "@/lib/load-matcher";
 import { generateResolutionPlan } from "@/lib/resolution";
@@ -37,10 +37,13 @@ export async function fetchThreadDetail(tenantId: string, threadId: string) {
   const classificationIds = threadClassificationsRaw.map((c) => c.id);
   const timelineEntityIds = [threadId, ...allMsgIds, ...draftIds, ...classificationIds];
 
-  const [loadDocs, auditEntries] = await Promise.all([
+  const [loadDocs, msgAttachments, auditEntries] = await Promise.all([
     matchedLoad
       ? db.select().from(loadDocuments).where(eq(loadDocuments.loadId, matchedLoad.id))
       : Promise.resolve([] as typeof loadDocuments.$inferSelect[]),
+    allMsgIds.length
+      ? db.select().from(emailAttachments).where(inArray(emailAttachments.messageId, allMsgIds))
+      : Promise.resolve([] as typeof emailAttachments.$inferSelect[]),
     timelineEntityIds.length
       ? db.select().from(auditLogs)
           .where(and(eq(auditLogs.tenantId, tenantId), inArray(auditLogs.entityId, timelineEntityIds)))
@@ -71,6 +74,13 @@ export async function fetchThreadDetail(tenantId: string, threadId: string) {
     ? generateResolutionPlan({ category: classification.category, classification, matchedLoad, appliedSops })
     : null;
 
+  // Index attachments by messageId for easy lookup in the UI
+  const attachmentsByMessage: Record<string, typeof emailAttachments.$inferSelect[]> = {};
+  for (const a of msgAttachments) {
+    if (!attachmentsByMessage[a.messageId]) attachmentsByMessage[a.messageId] = [];
+    attachmentsByMessage[a.messageId].push(a);
+  }
+
   return {
     messages,
     classification,
@@ -79,6 +89,7 @@ export async function fetchThreadDetail(tenantId: string, threadId: string) {
     timeline,
     appliedSops,
     loadDocs,
+    attachmentsByMessage,
     resolutionPlan,
   };
 }
