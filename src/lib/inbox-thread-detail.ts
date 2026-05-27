@@ -1,13 +1,13 @@
 import { db } from "@/db";
 import { emailMessages, aiClassifications, aiDrafts, sopRules, loadDocuments, auditLogs, emailAttachments } from "@/db/schema";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, asc, and, inArray } from "drizzle-orm";
 import { matchLoad } from "@/lib/load-matcher";
 import { generateResolutionPlan } from "@/lib/resolution";
 
 export async function fetchThreadDetail(tenantId: string, threadId: string) {
   const messages = await db.query.emailMessages.findMany({
     where: eq(emailMessages.threadId, threadId),
-    orderBy: [desc(emailMessages.receivedAt)],
+    orderBy: [asc(emailMessages.receivedAt)],
   });
 
   const allMsgIds = messages.map((m) => m.id);
