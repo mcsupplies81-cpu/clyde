@@ -410,6 +410,7 @@ async function main() {
           rate_confirmation: "rate confirmation|rate con",
           carrier_update: "check call|in transit|delivered|picked up",
           appointment_change: "reschedule|appointment",
+          carrier_concern: "re-broker|rebrok|substitute carrier|double.broker|partner carrier|cannot cover|drop.*load",
         };
         let category = "unknown";
         const text = `${t.subject} ${msg.body}`.toLowerCase();
@@ -444,7 +445,7 @@ async function main() {
 
         const draftBody = DRAFT_TEMPLATES[category];
         if (draftBody) {
-          const requireApproval = ["escalation", "detention_accessorial", "quote_request", "billing_invoice"].includes(category);
+          const requireApproval = ["escalation", "detention_accessorial", "quote_request", "billing_invoice", "carrier_concern"].includes(category);
           const status = requireApproval ? "pending" : "approved";
           await db.insert(schema.aiDrafts).values({
             tenantId: tenant.id,

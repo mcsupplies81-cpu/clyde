@@ -116,7 +116,16 @@ export function GenerateDraftForm({
 
 // ─── Draft actions (approve / edit / reject) ──────────────────────────────────
 
-const BLOCKED_SEND_CATEGORIES = new Set(["detention_accessorial", "billing_invoice", "escalation", "unknown", "quote_request"]);
+const BLOCKED_SEND_CATEGORIES = new Set(["detention_accessorial", "billing_invoice", "escalation", "unknown", "quote_request", "carrier_concern"]);
+
+const BLOCKED_REASON: Record<string, string> = {
+  detention_accessorial: "Detention & accessorial charges require human review before any response.",
+  billing_invoice: "Billing disputes must be reviewed by your billing team before replying.",
+  escalation: "Escalations require a direct human response — not an auto-draft.",
+  quote_request: "Quotes need pricing review before sending.",
+  carrier_concern: "Re-brokering and carrier compliance issues require human approval.",
+  unknown: "Unclassified emails should be reviewed before sending.",
+};
 
 export function DraftActions({
   draftId,
@@ -237,7 +246,19 @@ export function DraftActions({
             </form>
           )}
           {isSendBlocked && (
-            <span style={{ fontSize: 11, color: "#9CA3AF", alignSelf: "center" }}>Manual send required</span>
+            <div style={{ width: "100%", marginTop: 6 }}>
+              <span style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 600 }}>Manual send required</span>
+              {category && BLOCKED_REASON[category] && (
+                <span style={{ fontSize: 11, color: "#C4C4C4", marginLeft: 6 }}>— {BLOCKED_REASON[category]}</span>
+              )}
+            </div>
+          )}
+          {demoState?.success && (
+            <div style={{ width: "100%", marginTop: 6, padding: "6px 10px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 5, display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, color: "#16A34A", fontWeight: 600 }}>✓ Sent</span>
+              <span style={{ fontSize: 11, color: "#6B7280" }}>Thread moved to</span>
+              <a href="?filter=sent" style={{ fontSize: 11, color: "#2563EB", fontWeight: 600, textDecoration: "none" }}>Sent tab →</a>
+            </div>
           )}
           {sendState?.error && (
             <div style={{ width: "100%", color: "#DC2626", fontSize: 11, marginTop: 4 }}>{sendState.error}</div>

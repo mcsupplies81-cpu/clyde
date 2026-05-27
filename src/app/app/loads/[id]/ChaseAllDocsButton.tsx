@@ -1,37 +1,40 @@
 "use client";
 
 import { useState, useActionState } from "react";
-import { chaseDocumentAction, type ChaseResult } from "./actions";
+import { chaseAllDocumentsAction, type ChaseResult } from "./actions";
 
 interface Props {
   loadId: string;
   loadNumber: string;
-  docType: string;
+  missingDocs: string[];
   carrierName?: string | null;
   defaultCarrierEmail?: string | null;
 }
 
-function defaultMessage(docType: string, loadNumber: string, carrierName?: string | null) {
+function defaultMessage(missingDocs: string[], loadNumber: string, carrierName?: string | null) {
   const greeting = carrierName ? `Hi ${carrierName} team,` : "Hi,";
-  const docLower = docType.toLowerCase();
+  const docList = missingDocs.map((d) => `  • ${d}`).join("\n");
   return `${greeting}
 
-Could you please send over the ${docLower} for Load #${loadNumber}? We need it to complete the billing process.
+We are missing the following documents for Load #${loadNumber}:
+
+${docList}
+
+Could you please send these over as soon as possible? We need them to complete our billing and records.
 
 Thank you!`;
 }
 
-export function ChaseDocumentButton({
+export function ChaseAllDocsButton({
   loadId,
   loadNumber,
-  docType,
+  missingDocs,
   carrierName,
   defaultCarrierEmail,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [result, action, isPending] = useActionState<ChaseResult | null, FormData>(chaseDocumentAction, null);
+  const [result, action, isPending] = useActionState<ChaseResult | null, FormData>(chaseAllDocumentsAction, null);
 
-  // Auto-close on success after a beat
   const sent = result?.ok === true;
 
   if (sent) {
@@ -40,9 +43,9 @@ export function ChaseDocumentButton({
         fontSize: 11, fontWeight: 600,
         color: "#16A34A", background: "#F0FDF4",
         border: "1px solid #BBF7D0",
-        padding: "2px 10px", borderRadius: 4,
+        padding: "3px 12px", borderRadius: 4,
       }}>
-        ✓ {result.mode === "dry-run" ? "Drafted (dry run)" : (result.followUpId ? "Sent · follow-up scheduled" : "Sent")}
+        ✓ {result.mode === "dry-run" ? "Drafted (dry run)" : `Sent — ${missingDocs.length} doc${missingDocs.length > 1 ? "s" : ""} requested`}
       </span>
     );
   }
@@ -53,14 +56,15 @@ export function ChaseDocumentButton({
         type="button"
         onClick={() => setOpen(true)}
         style={{
-          fontSize: 11, fontWeight: 600,
-          color: "#2563EB", background: "none",
-          border: "1px solid #BFDBFE",
-          padding: "2px 10px", borderRadius: 4,
+          fontSize: 11, fontWeight: 700,
+          color: "#FFFFFF", background: "#2563EB",
+          border: "none",
+          padding: "4px 12px", borderRadius: 4,
           cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 5,
         }}
       >
-        Chase →
+        📧 Chase All Missing ({missingDocs.length})
       </button>
     );
   }
@@ -68,19 +72,22 @@ export function ChaseDocumentButton({
   return (
     <div style={{
       marginTop: 10,
-      background: "#F8FBFF",
+      background: "#F0F7FF",
       border: "1px solid #BFDBFE",
       borderRadius: 8,
       padding: 14,
       width: "100%",
     }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#1D4ED8", marginBottom: 10 }}>
-        Chase {docType} — Load #{loadNumber}
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#1D4ED8", marginBottom: 6 }}>
+        Chase All Missing Docs — Load #{loadNumber}
+      </div>
+      <div style={{ fontSize: 11, color: "#3B82F6", marginBottom: 10 }}>
+        {missingDocs.join(", ")}
       </div>
 
       <form action={action}>
         <input type="hidden" name="loadId" value={loadId} />
-        <input type="hidden" name="docType" value={docType} />
+        <input type="hidden" name="docTypes" value={missingDocs.join(",")} />
 
         {/* Carrier email */}
         <div style={{ marginBottom: 8 }}>
@@ -110,8 +117,8 @@ export function ChaseDocumentButton({
           <textarea
             name="message"
             required
-            rows={6}
-            defaultValue={defaultMessage(docType, loadNumber, carrierName)}
+            rows={8}
+            defaultValue={defaultMessage(missingDocs, loadNumber, carrierName)}
             style={{
               width: "100%", boxSizing: "border-box",
               background: "#FFFFFF", border: "1px solid #DBEAFE",
@@ -129,39 +136,19 @@ export function ChaseDocumentButton({
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8 }}>
           <button
             type="submit"
-            name="withFollowUp"
-            value="false"
             disabled={isPending}
             style={{
-              flex: 1,
-              padding: "7px 0",
+              flex: 1, padding: "7px 0",
               background: isPending ? "#93C5FD" : "#2563EB",
               border: "none", borderRadius: 5,
               color: "#FFFFFF", fontSize: 12, fontWeight: 600,
               cursor: isPending ? "default" : "pointer",
             }}
           >
-            {isPending ? "Sending…" : "Send Once"}
-          </button>
-          <button
-            type="submit"
-            name="withFollowUp"
-            value="true"
-            disabled={isPending}
-            title="Sends now + auto follow-up every 2 days (up to 3 total)"
-            style={{
-              flex: 1,
-              padding: "7px 0",
-              background: isPending ? "#D8B4FE" : "#7C3AED",
-              border: "none", borderRadius: 5,
-              color: "#FFFFFF", fontSize: 12, fontWeight: 600,
-              cursor: isPending ? "default" : "pointer",
-            }}
-          >
-            {isPending ? "Sending…" : "Send + Follow Up 🔄"}
+            {isPending ? "Sending…" : `Send Chase Email (${missingDocs.length} docs)`}
           </button>
           <button
             type="button"

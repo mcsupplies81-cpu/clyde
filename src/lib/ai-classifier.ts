@@ -9,6 +9,7 @@ export const CATEGORIES = [
   "detention_accessorial",
   "billing_invoice",
   "escalation",
+  "carrier_concern",
   "unknown",
 ] as const;
 
@@ -72,6 +73,7 @@ function extractEntities(category: Category, subject: string, body: string): Ext
     billing_invoice: "Billing or invoice inquiry",
     escalation: "Urgent escalation request",
     quote_request: "Request freight rate quote",
+    carrier_concern: "Carrier compliance / re-brokering concern",
   };
 
   return {
@@ -113,6 +115,7 @@ export function mockClassify(input: ClassifyInput): Classification {
     { keywords: ["invoice", "billing", "payment", "remittance"], category: "billing_invoice", action: "Route to billing team." },
     { keywords: ["escalate", "manager", "unacceptable", "furious", "lawsuit"], category: "escalation", action: "Escalate to operations lead immediately." },
     { keywords: ["check call", "driver update", "in transit", "picked up", "delivered"], category: "carrier_update", action: "Log update and notify customer if needed." },
+    { keywords: ["re-broker", "rebrok", "substitute carrier", "double broker", "partner carrier", "cannot cover", "drop the load", "give to another", "pass to another"], category: "carrier_concern", action: "Review carrier compliance issue — requires human approval before responding." },
   ];
 
   const hit = rules.find((r) => r.keywords.some((k) => text.includes(k)));

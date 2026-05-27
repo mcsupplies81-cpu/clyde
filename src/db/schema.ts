@@ -344,6 +344,32 @@ export const apiKeys = pgTable(
   (t) => [index("api_keys_tenant_id_idx").on(t.tenantId)],
 );
 
+// ─── Chase Follow-ups ────────────────────────────────────────────────────────
+export const chaseFollowUpStatusEnum = pgEnum("chase_follow_up_status", ["active", "completed", "cancelled"]);
+
+export const chaseFollowUps = pgTable(
+  "chase_follow_ups",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    loadId: uuid("load_id").notNull().references(() => loads.id, { onDelete: "cascade" }),
+    docTypes: text("doc_types").notNull(), // comma-separated: "BOL,POD"
+    carrierEmail: text("carrier_email").notNull(),
+    messageTemplate: text("message_template").notNull(),
+    sendCount: integer("send_count").notNull().default(0),
+    maxSends: integer("max_sends").notNull().default(3),
+    intervalDays: integer("interval_days").notNull().default(2),
+    nextSendAt: timestamp("next_send_at", { withTimezone: true }).notNull(),
+    status: chaseFollowUpStatusEnum("status").notNull().default("active"),
+    createdAt,
+  },
+  (t) => [
+    index("chase_follow_ups_tenant_id_idx").on(t.tenantId),
+    index("chase_follow_ups_load_id_idx").on(t.loadId),
+    index("chase_follow_ups_status_next_idx").on(t.status, t.nextSendAt),
+  ],
+);
+
 // Relations
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   users: many(users),

@@ -28,6 +28,18 @@ async function updateTenantName(formData: FormData) {
   revalidatePath("/app/settings");
 }
 
+async function updateInboxEmail(formData: FormData) {
+  "use server";
+  const tenantId = (await getTenantIdForUser()) ?? "";
+  const inboxId  = String(formData.get("inboxId") ?? "").trim();
+  const email    = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!tenantId || !inboxId || !email || !email.includes("@")) return;
+  await db.update(inboxes)
+    .set({ emailAddress: email })
+    .where(and(eq(inboxes.id, inboxId), eq(inboxes.tenantId, tenantId)));
+  revalidatePath("/app/settings");
+}
+
 async function createApiKeyAction(_prev: unknown, formData: FormData) {
   "use server";
   const tenantId = (await getTenantIdForUser()) ?? "";
@@ -94,14 +106,6 @@ export default async function SettingsPage() {
 
           <div style={rowStyle}>
             <div>
-              <div style={labelStyle}>Demo inbox address</div>
-              <div style={subtleStyle}>From inboxes table</div>
-            </div>
-            <code style={codeStyle}>{demoInbox?.emailAddress ?? "No inbox found"}</code>
-          </div>
-
-          <div style={rowStyle}>
-            <div>
               <div style={labelStyle}>Timezone</div>
               <div style={subtleStyle}>Timestamps displayed in this timezone</div>
             </div>
@@ -141,34 +145,51 @@ export default async function SettingsPage() {
             Clyde will classify it, match it to a load, and draft a reply automatically.
           </p>
 
-          {/* Inbound address */}
-          <div style={{ ...rowStyle, flexWrap: "wrap" as const, gap: 10 }}>
-            <div>
-              <div style={labelStyle}>Your Clyde inbox address</div>
-              <div style={subtleStyle}>Set this as your forwarding destination</div>
+          {/* Inbound address — editable */}
+          {demoInbox ? (
+            <form action={updateInboxEmail} style={{ paddingTop: 4 }}>
+              <input type="hidden" name="inboxId" value={demoInbox.id} />
+              <div style={{ marginBottom: 6 }}>
+                <div style={labelStyle}>Inbound email address</div>
+                <div style={{ ...subtleStyle, marginBottom: 8 }}>
+                  Paste your Postmark inbound address here — all emails sent to it arrive in Clyde.
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    name="email"
+                    type="email"
+                    required
+                    defaultValue={demoInbox.emailAddress}
+                    placeholder="you@inbound.postmarkapp.com"
+                    style={{ ...inputStyle, flex: 1, fontFamily: "monospace", fontSize: 12 }}
+                  />
+                  <button type="submit" style={buttonStyle}>Save</button>
+                </div>
+              </div>
+            </form>
+          ) : (
+            <div style={rowStyle}>
+              <div style={labelStyle}>Inbound email address</div>
+              <span style={{ fontSize: 12, color: "#9CA3AF" }}>No inbox found — contact support</span>
             </div>
-            <code style={{ ...codeStyle, fontSize: 12, background: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE", padding: "6px 12px" }}>
-              {demoInbox?.emailAddress ?? "—"}
-            </code>
-          </div>
+          )}
 
-          {/* Setup steps */}
-          <div style={{ borderTop: "1px solid #F2F2F2", paddingTop: 14, marginTop: 4 }}>
+          {/* Postmark setup steps */}
+          <div style={{ borderTop: "1px solid #F2F2F2", paddingTop: 14, marginTop: 8 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: 10 }}>
-              Setup (30 seconds)
+              Postmark setup (5 min)
             </div>
-            <div style={{ display: "flex", flexDirection: "column" as const, gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
               {[
-                { step: "1", label: "Outlook", detail: "Settings → Mail → Forwarding → Add forwarding address above" },
-                { step: "2", label: "Gmail", detail: "Settings → Forwarding and POP/IMAP → Add a forwarding address" },
-                { step: "3", label: "Any client", detail: "Set up an auto-forward rule: From = anyone, To = your ops address, Forward to Clyde" },
-              ].map(({ step, label, detail }) => (
+                { step: "1", detail: "Create a free account at postmark.com → add a Server → go to the Inbound tab" },
+                { step: "2", detail: <>Set the webhook URL to: <code style={{ background: "#F2F2F2", padding: "1px 5px", borderRadius: 3, fontSize: 11 }}>{baseUrl}/api/webhooks/inbound-email</code></> },
+                { step: "3", detail: "Copy the inbound email address Postmark gives you (e.g. abc123@inbound.postmarkapp.com) and paste it above" },
+                { step: "4", detail: "Copy your Server API Token → add it to Vercel env vars as POSTMARK_API_TOKEN" },
+                { step: "5", detail: "Send a test email to your inbound address — it should appear in Clyde within seconds" },
+              ].map(({ step, detail }) => (
                 <div key={step} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                   <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#EFF6FF", border: "1px solid #BFDBFE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#2563EB", flexShrink: 0, marginTop: 1 }}>{step}</div>
-                  <div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "#292929" }}>{label}: </span>
-                    <span style={{ fontSize: 12, color: "#7F7F7F" }}>{detail}</span>
-                  </div>
+                  <div style={{ fontSize: 12, color: "#7F7F7F", lineHeight: 1.5, paddingTop: 2 }}>{detail}</div>
                 </div>
               ))}
             </div>
@@ -177,18 +198,17 @@ export default async function SettingsPage() {
           {/* Webhook info */}
           <details style={{ borderTop: "1px solid #F2F2F2", paddingTop: 10, marginTop: 10 }}>
             <summary style={{ cursor: "pointer", fontSize: 12, color: "#2563EB", fontWeight: 600, userSelect: "none" as const }}>
-              Developer: webhook endpoint ↓
+              Advanced: raw webhook endpoint ↓
             </summary>
             <div style={{ marginTop: 10 }}>
               <div style={{ fontSize: 11, color: "#7F7F7F", marginBottom: 6 }}>
-                Using Postmark, Mailgun, or SendGrid inbound parse? POST to:
+                Postmark, Mailgun, SendGrid inbound parse — all send to the same endpoint:
               </div>
               <code style={{ ...codeStyle, fontSize: 11, display: "block", padding: "8px 12px" }}>
                 POST {baseUrl}/api/webhooks/inbound-email
               </code>
               <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 6 }}>
-                Set header <code>x-webhook-secret</code> = <code>INBOUND_WEBHOOK_SECRET</code> env var.
-                Postmark inbound format supported out of the box.
+                Optional: set header <code>x-webhook-secret</code> = <code>INBOUND_WEBHOOK_SECRET</code> env var to secure the endpoint.
               </div>
             </div>
           </details>
@@ -269,14 +289,26 @@ Authorization: Bearer clyde_live_...
         </section>
 
         <section style={sectionStyle}>
-          <h2 style={sectionTitleStyle}>Demo Tools</h2>
-          <div style={rowStyle}>
-            <div style={labelStyle}>Re-seed demo data</div>
-            <code style={codeStyle}>npm run db:seed</code>
-          </div>
+          <h2 style={sectionTitleStyle}>Debug Info</h2>
           <div style={rowStyle}>
             <div style={labelStyle}>Tenant ID</div>
-            <code style={codeStyle}>{tenantId || "DEMO_TENANT_ID not set"}</code>
+            <code style={codeStyle}>{tenantId || "not set"}</code>
+          </div>
+          <div style={rowStyle}>
+            <div style={labelStyle}>Inbox email</div>
+            <code style={codeStyle}>{demoInbox?.emailAddress ?? "none"}</code>
+          </div>
+          <div style={rowStyle}>
+            <div style={labelStyle}>Postmark sending</div>
+            <div style={{ ...pillStyle, background: process.env.POSTMARK_API_TOKEN ? "#F0FDF4" : "#FFF7ED", color: process.env.POSTMARK_API_TOKEN ? "#16A34A" : "#EA580C" }}>
+              {process.env.POSTMARK_API_TOKEN ? "Connected" : "Not configured — emails dry-run only"}
+            </div>
+          </div>
+          <div style={rowStyle}>
+            <div style={labelStyle}>Blob storage</div>
+            <div style={{ ...pillStyle, background: process.env.BLOB_READ_WRITE_TOKEN ? "#F0FDF4" : "#F9FAFB", color: process.env.BLOB_READ_WRITE_TOKEN ? "#16A34A" : "#9CA3AF" }}>
+              {process.env.BLOB_READ_WRITE_TOKEN ? "Connected" : "Not configured — attachments metadata only"}
+            </div>
           </div>
         </section>
 

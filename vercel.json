@@ -1,1 +1,12 @@
-{}
+{
+  "crons": [
+    {
+      "path": "/api/cron/autopilot",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/chase-followups",
+      "schedule": "0 8 * * *"
+    }
+  ]
+}

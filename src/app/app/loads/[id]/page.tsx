@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { fmtDate, fmtDateTime, fmtCurrency, etaLabel, statusProgress } from "@/lib/format";
 import { actionLabel } from "@/lib/workflow";
 import { ChaseDocumentButton } from "./ChaseDocumentButton";
+import { ChaseAllDocsButton } from "./ChaseAllDocsButton";
 
 const REQUIRED_DOCS = ["BOL", "POD", "Rate Confirmation", "Invoice", "Lumper Receipt"];
 const STATUS_OPTIONS = ["Booked", "Dispatched", "At Pickup", "In Transit", "Out for Delivery", "Delivered", "Exception"];
@@ -163,6 +164,39 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
           ← Load Board
         </Link>
       </div>
+
+      {/* BOL chase banner — show when BOL missing and load is at pickup / in transit */}
+      {missingDocs.includes("BOL") && ["At Pickup", "Dispatched", "In Transit"].some(
+        (s) => load.currentStatus?.toLowerCase().includes(s.toLowerCase())
+      ) && (
+        <div style={{
+          marginBottom: 10,
+          background: "#EFF6FF",
+          border: "1px solid #BFDBFE",
+          borderLeft: "3px solid #2563EB",
+          borderRadius: "0 8px 8px 0",
+          padding: "10px 16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#1D4ED8" }}>📄 BOL Missing</div>
+            <div style={{ fontSize: 11, color: "#3B82F6", marginTop: 2 }}>
+              Load is {load.currentStatus} — the BOL should be on file before delivery.
+            </div>
+          </div>
+          <ChaseDocumentButton
+            loadId={load.id}
+            loadNumber={load.loadNumber}
+            docType="BOL"
+            carrierName={load.carrierName}
+            defaultCarrierEmail={carrierEmail}
+          />
+        </div>
+      )}
 
       {/* POD chase banner — show when POD missing and load is active/delivered */}
       {missingDocs.includes("POD") && ["In Transit", "Delivered", "Out for Delivery"].some(
@@ -345,7 +379,25 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
             {missingDocs.length > 0 && (
               <div>
                 <div style={{ fontSize: 10, color: "#9CA3AF", marginBottom: 8 }}>Missing documents:</div>
+
+                {/* Chase all in one email — shown when 2+ docs missing */}
+                {missingDocs.length >= 2 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <ChaseAllDocsButton
+                      loadId={load.id}
+                      loadNumber={load.loadNumber}
+                      missingDocs={missingDocs}
+                      carrierName={load.carrierName}
+                      defaultCarrierEmail={carrierEmail}
+                    />
+                  </div>
+                )}
+
+                {/* Individual chase per doc */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {missingDocs.length >= 2 && (
+                    <div style={{ fontSize: 10, color: "#C4C4C4", marginBottom: 2 }}>— or chase individually —</div>
+                  )}
                   {missingDocs.map((dt) => (
                     <div key={dt}>
                       <div style={{

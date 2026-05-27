@@ -541,6 +541,31 @@ export function InboxRoot({
                   docCount={detail.loadDocs.length}
                 />
 
+                {/* Thread participant summary — shown when >1 unique inbound sender */}
+                {(() => {
+                  const inboundSenders = detail.messages
+                    .filter((m) => m.direction === "inbound")
+                    .reduce<{ name: string; email: string }[]>((acc, m) => {
+                      const email = m.senderEmail;
+                      if (!acc.some((s) => s.email === email)) acc.push({ name: m.senderName ?? email, email });
+                      return acc;
+                    }, []);
+                  if (inboundSenders.length <= 1) return null;
+                  return (
+                    <div style={{ marginBottom: 8, padding: "6px 10px", background: "#F5F5F5", borderRadius: 6, fontSize: 11, color: "#6B7280", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 600, color: "#5D5D5D" }}>Thread:</span>
+                      {inboundSenders.map((s, i) => (
+                        <span key={s.email}>
+                          <span style={{ color: "#374151" }}>{s.name}</span>
+                          <span style={{ color: "#C4C4C4", fontSize: 10 }}> &lt;{s.email}&gt;</span>
+                          {i < inboundSenders.length - 1 && <span style={{ color: "#D1D5DB" }}> · </span>}
+                        </span>
+                      ))}
+                      <span style={{ color: "#C4C4C4", marginLeft: 4 }}>· {detail.messages.length} message{detail.messages.length !== 1 ? "s" : ""}</span>
+                    </div>
+                  );
+                })()}
+
                 {/* Messages */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
                   {detail.messages.map((msg) => {
