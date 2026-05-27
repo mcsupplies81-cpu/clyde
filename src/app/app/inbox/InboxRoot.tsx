@@ -58,19 +58,26 @@ type InboxRootProps = {
   filter: string | undefined;
 };
 
-const FILTER_TABS = [
-  { label: "All",            value: undefined },
-  { label: "Needs Review",   value: "needs_review" },
-  { label: "Ready to Send",  value: "ready_to_send" },
+// Primary filters shown as large tabs (Superhuman-style)
+const PRIMARY_TABS = [
+  { label: "All",           value: undefined },
+  { label: "Needs Review",  value: "needs_review" },
+  { label: "Ready to Send", value: "ready_to_send" },
+  { label: "Done",          value: "resolved" },
+];
+
+// Secondary filters shown below, smaller
+const SECONDARY_TABS = [
   { label: "Sent",           value: "sent" },
   { label: "Escalated",      value: "escalated" },
-  { label: "Resolved",       value: "resolved" },
-  { label: "Needs POD",      value: "pod_request" },
-  { label: "Needs BOL",      value: "bol_request" },
   { label: "Quotes",         value: "quote_request" },
   { label: "Status Updates", value: "status_request" },
+  { label: "Needs POD",      value: "pod_request" },
+  { label: "Needs BOL",      value: "bol_request" },
   { label: "Appt Changes",   value: "appointment_change" },
 ];
+
+const FILTER_TABS = [...PRIMARY_TABS, ...SECONDARY_TABS];
 
 const PRIORITY_COLOR: Record<string, string> = {
   urgent: "#DC2626", high: "#EA580C", normal: "#2563EB", low: "#9CA3AF",
@@ -220,9 +227,38 @@ export function InboxRoot({
             </div>
           </div>
 
-          {/* Filter tabs */}
-          <div style={{ display: "flex", gap: 0, padding: "0 8px 0", overflowX: "auto" }}>
-            {FILTER_TABS.map(({ label, value }) => {
+          {/* Primary filter tabs — large, Superhuman-style */}
+          <div style={{ display: "flex", alignItems: "center", padding: "0 12px", gap: 2, borderBottom: "1px solid #F0F0F0" }}>
+            {PRIMARY_TABS.map(({ label, value }, i) => {
+              const active = filter === value;
+              const href = value ? `/app/inbox?filter=${value}` : "/app/inbox";
+              return (
+                <span key={label} style={{ display: "flex", alignItems: "center" }}>
+                  {i > 0 && (
+                    <span style={{ color: "#E0E0E0", fontSize: 13, margin: "0 1px", userSelect: "none" }}>·</span>
+                  )}
+                  <Link
+                    href={href}
+                    style={{
+                      padding: "7px 5px",
+                      fontSize: 13,
+                      fontWeight: active ? 600 : 400,
+                      textDecoration: "none",
+                      whiteSpace: "nowrap",
+                      color: active ? "#111827" : "#9CA3AF",
+                      borderBottom: active ? "2px solid #111827" : "2px solid transparent",
+                    }}
+                  >
+                    {label}
+                  </Link>
+                </span>
+              );
+            })}
+          </div>
+
+          {/* Secondary filters — smaller, scrollable */}
+          <div style={{ display: "flex", gap: 0, padding: "0 8px", overflowX: "auto", borderBottom: "1px solid #F4F4F4" }}>
+            {SECONDARY_TABS.map(({ label, value }) => {
               const active = filter === value;
               const href = value ? `/app/inbox?filter=${value}` : "/app/inbox";
               return (
@@ -230,12 +266,12 @@ export function InboxRoot({
                   key={label}
                   href={href}
                   style={{
-                    padding: "5px 7px",
+                    padding: "4px 6px",
                     fontSize: 11,
                     fontWeight: active ? 600 : 400,
                     textDecoration: "none",
                     whiteSpace: "nowrap",
-                    color: active ? "#1D4ED8" : "#9CA3AF",
+                    color: active ? "#2563EB" : "#C4C4C4",
                     borderBottom: active ? "2px solid #2563EB" : "2px solid transparent",
                   }}
                 >
