@@ -9,12 +9,16 @@ import { eq } from "drizzle-orm";
  * Falls back to DEMO_TENANT_ID in dev when Clerk is not configured.
  */
 export async function getTenantIdForUser(): Promise<string | null> {
+  // When DEMO_TENANT_ID is set (demo / staging mode), always use it.
+  // This lets the seed data show regardless of which Clerk user is signed in.
+  if (process.env.DEMO_TENANT_ID) {
+    return process.env.DEMO_TENANT_ID;
+  }
+
   const { userId } = await auth();
 
-  // No Clerk session — dev fallback
-  if (!userId) {
-    return process.env.DEMO_TENANT_ID ?? null;
-  }
+  // No Clerk session and no demo override
+  if (!userId) return null;
 
   // Happy path: user already has a tenant
   const existing = await db.query.users.findFirst({
