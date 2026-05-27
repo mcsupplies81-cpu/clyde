@@ -1,4 +1,5 @@
 import { SearchBar } from "./SearchBar";
+import { UserButton } from "@clerk/nextjs";
 
 export function TopBar({ companyName }: { companyName?: string | null }) {
   return (
@@ -20,29 +21,8 @@ export function TopBar({ companyName }: { companyName?: string | null }) {
           <span style={{ fontSize: 11, color: "#9CA3AF" }}>Connected</span>
         </div>
         <div style={{ width: 1, height: 16, background: "#E8E8E8" }} />
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 7,
-          cursor: "pointer",
-        }}>
-          <span style={{ fontSize: 11, color: "#7F7F7F" }}>{companyName ?? "Clyde"}</span>
-          <div style={{
-            width: 26,
-            height: 26,
-            borderRadius: 6,
-            background: "#EFF6FF",
-            border: "1px solid #BFDBFE",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 10,
-            fontWeight: 700,
-            color: "#2563EB",
-          }}>
-            MW
-          </div>
-        </div>
+        <span style={{ fontSize: 11, color: "#7F7F7F" }}>{companyName ?? "Clyde"}</span>
+        <UserButton />
       </div>
     </header>
   );
