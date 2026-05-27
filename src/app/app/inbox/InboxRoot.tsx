@@ -351,32 +351,48 @@ export function InboxRoot({
               </Link>
             );
           })}
-          {/* Filters dropdown */}
-          <div style={{ position: "relative", marginLeft: 4 }} ref={filterPanelRef}>
+          {connection && <SyncButton />}
+        </div>
+      </div>
+
+      {/* ── Content row ─────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+
+      {/* ── Left: thread list ───────────────────────────────────────────── */}
+      <div className="inbox-threads" style={{ width: 300, minWidth: 300, borderRight: "1px solid #EBEBEB", display: "flex", flexDirection: "column", overflow: "hidden", background: "#FFFFFF" }}>
+
+        {/* Thread list header */}
+        <div style={{ padding: "8px 10px 8px 14px", borderBottom: "1px solid #F0F0F0", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.6px", flex: 1 }}>
+            {filter ? ([...SECONDARY_TABS, ...PRIMARY_TABS] as { label: string; value: string | undefined }[]).find(t => t.value === filter)?.label ?? "All" : "All"}
+          </span>
+
+          {/* Filters button */}
+          <div style={{ position: "relative" }} ref={filterPanelRef}>
             <button
               type="button"
               onClick={() => setFilterPanelOpen((o) => !o)}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 4,
-                padding: "3px 9px",
-                background: activeFilterCount > 0 ? "#EFF6FF" : "transparent",
-                border: `1px solid ${activeFilterCount > 0 ? "#BFDBFE" : "transparent"}`,
-                borderRadius: 20,
+                padding: "3px 8px",
+                background: activeFilterCount > 0 ? "#EFF6FF" : "#F5F5F5",
+                border: `1px solid ${activeFilterCount > 0 ? "#BFDBFE" : "#E8E8E8"}`,
+                borderRadius: 5,
                 fontSize: 11,
                 fontWeight: activeFilterCount > 0 ? 600 : 400,
-                color: activeFilterCount > 0 ? "#2563EB" : "#B0B0B0",
+                color: activeFilterCount > 0 ? "#2563EB" : "#9CA3AF",
                 cursor: "pointer",
                 whiteSpace: "nowrap",
               }}
             >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="4" y1="6" x2="20" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="11" y1="18" x2="13" y2="18" />
               </svg>
-              Filters
+              Filter
               {activeFilterCount > 0 && (
                 <span style={{
                   background: "#2563EB", color: "#FFFFFF",
-                  borderRadius: "50%", width: 14, height: 14,
+                  borderRadius: "50%", width: 13, height: 13,
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                   fontSize: 8, fontWeight: 700,
                 }}>
@@ -387,9 +403,9 @@ export function InboxRoot({
 
             {filterPanelOpen && (
               <div style={{
-                position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50,
+                position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50,
                 background: "#FFFFFF", border: "1px solid #E8E8E8",
-                borderRadius: 10, boxShadow: "0 4px 20px rgba(0,0,0,0.10)",
+                borderRadius: 10, boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
                 padding: 14, minWidth: 220,
               }}>
                 {/* Customer / company */}
@@ -411,17 +427,17 @@ export function InboxRoot({
                   </div>
                 </div>
 
-                {/* Priority / Temperature */}
+                {/* Priority */}
                 <div style={{ borderTop: "1px solid #F2F2F2", paddingTop: 12 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 7 }}>
                     Priority
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                     {[
-                      { label: "All",    value: "all",    color: "#6B7280", bg: "#F9FAFB", border: "#E8E8E8" },
+                      { label: "All",       value: "all",    color: "#6B7280", bg: "#F9FAFB", border: "#E8E8E8" },
                       { label: "🔥 Urgent", value: "urgent", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
-                      { label: "High",   value: "high",   color: "#EA580C", bg: "#FFF7ED", border: "#FED7AA" },
-                      { label: "Normal", value: "normal", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE" },
+                      { label: "High",      value: "high",   color: "#EA580C", bg: "#FFF7ED", border: "#FED7AA" },
+                      { label: "Normal",    value: "normal", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE" },
                     ].map(({ label, value, color, bg, border }) => (
                       <button key={value} type="button" onClick={() => setPriorityFilter(value)} style={{
                         border: `1px solid ${priorityFilter === value ? border : "#E8E8E8"}`,
@@ -451,23 +467,8 @@ export function InboxRoot({
             )}
           </div>
 
-          {connection && <SyncButton />}
-        </div>
-      </div>
-
-      {/* ── Content row ─────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-
-      {/* ── Left: thread list ───────────────────────────────────────────── */}
-      <div className="inbox-threads" style={{ width: 300, minWidth: 300, borderRight: "1px solid #EBEBEB", display: "flex", flexDirection: "column", overflow: "hidden", background: "#FFFFFF" }}>
-
-        {/* Thread list header — now just count */}
-        <div style={{ padding: "10px 14px 8px", borderBottom: "1px solid #F0F0F0", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.6px" }}>
-            {filter ? ([...SECONDARY_TABS, ...PRIMARY_TABS] as { label: string; value: string | undefined }[]).find(t => t.value === filter)?.label ?? "All" : "All"}
-          </span>
-            <span style={{ fontSize: 11, color: "#C4C4C4" }}>
-            {activeFilterCount > 0 ? `${filteredThreads.length} of ${threads.length}` : threads.length}
+          <span style={{ fontSize: 11, color: "#C4C4C4", flexShrink: 0 }}>
+            {activeFilterCount > 0 ? `${filteredThreads.length}/${threads.length}` : threads.length}
           </span>
         </div>
 
