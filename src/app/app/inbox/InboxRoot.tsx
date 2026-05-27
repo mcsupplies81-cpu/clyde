@@ -11,6 +11,7 @@ import {
   MarkSentForm, ResolveThreadForm, ShortcutHint,
 } from "./InboxActions";
 import { RightContextPanel } from "./components/RightContextPanel";
+import { LoadContextCard } from "./components/LoadContextCard";
 import { SyncButton } from "./SyncButton";
 import type { ThreadDetail } from "@/lib/inbox-thread-detail";
 
@@ -516,6 +517,12 @@ export function InboxRoot({
             {/* Conversation + draft */}
             <div style={{ flex: 1, overflow: "auto", padding: "16px 20px" }}>
               <div style={{ maxWidth: 760 }}>
+
+                {/* Load context card — shows when AI matched a load */}
+                <LoadContextCard
+                  matchedLoad={detail.matchedLoad}
+                  classification={detail.classification}
+                />
 
                 {/* Messages */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
