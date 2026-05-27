@@ -127,11 +127,14 @@ export function InboxRoot({
 
   // After server actions (generate draft, approve, etc.) Next.js streams fresh
   // initialDetail props. useState ignores prop changes after first render — sync here.
+  // Also handles URL-driven navigation (e.g. clicking a result in the search modal).
   useEffect(() => {
     if (!initialDetail || !initialSelectedId) return;
     _detailCache.set(initialSelectedId, initialDetail);
-    if (initialSelectedId === selectedIdRef.current) {
-      setDetail(initialDetail);
+    setDetail(initialDetail);
+    // Sync selection when navigating via URL (search, direct link, etc.)
+    if (initialSelectedId !== selectedIdRef.current) {
+      setSelectedId(initialSelectedId);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialDetail, initialSelectedId]);
@@ -172,6 +175,16 @@ export function InboxRoot({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Search modal → select thread instantly without a server round-trip
+  useEffect(() => {
+    function onSelectThread(e: Event) {
+      const { threadId } = (e as CustomEvent<{ threadId: string }>).detail;
+      if (threadId) selectThread(threadId);
+    }
+    window.addEventListener("clyde:select-thread", onSelectThread);
+    return () => window.removeEventListener("clyde:select-thread", onSelectThread);
+  }, [selectThread]);
+
   // Keyboard navigation
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -211,6 +224,7 @@ export function InboxRoot({
   return (
     <div
       className="inbox-root"
+      data-inbox-root="true"
       data-has-thread={selectedId ? "true" : "false"}
       style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#F8F8F7" }}
     >

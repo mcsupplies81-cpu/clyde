@@ -123,8 +123,16 @@ export function SearchModal() {
 
   const navigate = (type: "thread" | "load", id: string) => {
     closeModal();
-    if (type === "thread") router.push(`/app/inbox?threadId=${id}`);
-    else router.push(`/app/loads/${id}`);
+    if (type === "thread") {
+      // Fire a custom event so InboxRoot can select the thread instantly (no server round-trip).
+      // Falls back to router.push if the inbox isn't mounted (e.g. navigating from another page).
+      const dispatched = window.dispatchEvent(new CustomEvent("clyde:select-thread", { detail: { threadId: id } }));
+      if (!dispatched || !document.querySelector("[data-inbox-root]")) {
+        router.push(`/app/inbox?threadId=${id}`);
+      }
+    } else {
+      router.push(`/app/loads/${id}`);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
