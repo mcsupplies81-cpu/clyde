@@ -557,8 +557,7 @@ export function ManualReplyComposer({
       if (res?.success) {
         form.reset();
         setSentCount((c) => c + 1);
-        // Stay open so user can send another email immediately
-        setTimeout(() => textareaRef.current?.focus(), 60);
+        setOpen(false); // close composer; success flash shows on the footer bar
       }
     });
   }
