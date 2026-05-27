@@ -52,15 +52,25 @@ async function provisionTenant(clerkUserId: string): Promise<string> {
     provider: "other",
   });
 
-  // 3. Create user row
-  await db.insert(users).values({
-    tenantId: tenant.id,
-    clerkUserId,
-    name,
-    email,
-    role: "admin",
-  });
+  // 3. Upsert user row — race-safe: concurrent cold-start renders may both attempt this
+  //    If clerk_user_id already exists (race), ignore the conflict and re-query.
+  const [inserted] = await db
+    .insert(users)
+    .values({ tenantId: tenant.id, clerkUserId, name, email, role: "admin" })
+    .onConflictDoNothing()
+    .returning();
 
-  console.log(`[auth] Provisioned tenant ${tenant.id} for ${email}`);
-  return tenant.id;
+  if (inserted) {
+    console.log(`[auth] Provisioned tenant ${tenant.id} for ${email}`);
+    return inserted.tenantId;
+  }
+
+  // Race: another parallel render won — fetch the existing user's tenant
+  const raceWinner = await db.query.users.findFirst({
+    where: eq(users.clerkUserId, clerkUserId),
+    columns: { tenantId: true },
+  });
+  // Note: the tenant/inbox we just created is orphaned — acceptable for now (rare race)
+  console.log(`[auth] Race resolved for ${email}, using tenant ${raceWinner?.tenantId}`);
+  return raceWinner!.tenantId;
 }
