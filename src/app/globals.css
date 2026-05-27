@@ -24,29 +24,83 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Light scrollbar for content areas */
+/* Scrollbar */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 2px; }
 
+/* ── Inbox: back button hidden on desktop ─── */
+.inbox-back-btn  { display: none !important; }
+.mobile-menu-btn { display: none !important; }
 
-/* ── Inbox responsive layout ─────────────────────────────────────────────── */
+/* ── Mobile sidebar ──────────────────────────────────────────────────────── */
 
-/* Back button hidden on desktop */
-.inbox-back-btn { display: none !important; }
+/* The sidebar wrapper slides in from left on mobile */
+.app-sidebar-wrap {
+  display: flex;
+  flex-shrink: 0;
+}
 
+/* ── Responsive breakpoint ────────────────────────────────────────────────── */
 @media (max-width: 767px) {
-  /* Always hide right panel on mobile */
+
+  /* ── Sidebar: fixed overlay on mobile ── */
+  .app-sidebar-wrap {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 99;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+  }
+  .app-sidebar-wrap.mobile-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+  }
+
+  /* ── Show hamburger in top filter bar ── */
+  .mobile-menu-btn { display: flex !important; }
+
+  /* ── Inbox layout ── */
   .inbox-right { display: none !important; }
 
-  /* Full width columns */
-  .inbox-threads { width: 100% !important; min-width: 0 !important; border-right: none !important; }
-  .inbox-center  { width: 100% !important; }
+  .inbox-threads {
+    width: 100% !important;
+    min-width: 0 !important;
+    border-right: none !important;
+  }
 
-  /* No thread selected → show thread list, hide center */
-  .inbox-root[data-has-thread="false"] .inbox-center { display: none !important; }
+  .inbox-center { width: 100% !important; }
 
-  /* Thread selected → hide thread list, show center + back button */
-  .inbox-root[data-has-thread="true"] .inbox-threads { display: none !important; }
-  .inbox-root[data-has-thread="true"] .inbox-back-btn { display: flex !important; }
+  /* No thread selected: show list, hide detail */
+  .inbox-root[data-has-thread="false"] .inbox-center {
+    display: none !important;
+  }
+
+  /* Thread selected: hide list, show detail + back button */
+  .inbox-root[data-has-thread="true"] .inbox-threads {
+    display: none !important;
+  }
+  .inbox-root[data-has-thread="true"] .inbox-back-btn {
+    display: flex !important;
+  }
+
+  /* ── Filter tabs: hide secondary on mobile (too crowded) ── */
+  .inbox-secondary-tabs { display: none !important; }
+
+  /* ── Thread list: bigger tap targets ── */
+  .inbox-threads button > div {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+  }
+
+  /* ── Email detail: better mobile padding ── */
+  .inbox-center > div > div {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+
+  /* ── TopBar: hide company name on mobile ── */
+  .topbar-company { display: none !important; }
 }

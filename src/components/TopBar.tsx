@@ -18,7 +18,7 @@ export function TopBar({ companyName }: { companyName?: string | null }) {
         <span style={{ fontSize: 11, color: "#9CA3AF" }}>Live</span>
       </div>
       <div style={{ width: 1, height: 14, background: "#E8E8E8" }} />
-      <span style={{ fontSize: 11, color: "#7F7F7F", fontWeight: 500 }}>{companyName ?? "Clyde"}</span>
+      <span className="topbar-company" style={{ fontSize: 11, color: "#7F7F7F", fontWeight: 500 }}>{companyName ?? "Clyde"}</span>
       <UserButton />
     </header>
   );

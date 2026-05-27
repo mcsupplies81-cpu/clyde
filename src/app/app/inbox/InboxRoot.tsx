@@ -206,7 +206,11 @@ export function InboxRoot({
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#F8F8F7" }}>
+    <div
+      className="inbox-root"
+      data-has-thread={selectedId ? "true" : "false"}
+      style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#F8F8F7" }}
+    >
 
       {/* ── Full-width top nav — Superhuman style ───────────────────────── */}
       <div style={{
@@ -215,10 +219,21 @@ export function InboxRoot({
         flexShrink: 0,
         display: "flex",
         alignItems: "center",
-        padding: "0 20px",
+        padding: "0 12px 0 8px",
         gap: 0,
         height: 44,
+        overflowX: "auto",
       }}>
+        {/* Mobile hamburger — hidden on desktop via CSS */}
+        <button
+          className="mobile-menu-btn"
+          onClick={() => window.dispatchEvent(new CustomEvent("clyde:toggle-mobile-sidebar"))}
+          style={{ padding: "8px 10px 8px 4px", background: "none", border: "none", cursor: "pointer", color: "#9CA3AF", flexShrink: 0 }}
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
         {/* Primary tabs: All · Needs Review · Ready to Send · Done */}
         {PRIMARY_TABS.map(({ label, value }, i) => {
           const active = filter === value;
@@ -255,8 +270,8 @@ export function InboxRoot({
         {/* Spacer */}
         <div style={{ flex: 1 }} />
 
-        {/* Secondary filters as smaller chips */}
-        <div style={{ display: "flex", gap: 2, alignItems: "center", overflowX: "auto" }}>
+        {/* Secondary filters as smaller chips — hidden on mobile */}
+        <div className="inbox-secondary-tabs" style={{ display: "flex", gap: 2, alignItems: "center", overflowX: "auto" }}>
           {SECONDARY_TABS.map(({ label, value }) => {
             const active = filter === value;
             const href = value ? `/app/inbox?filter=${value}` : "/app/inbox";
@@ -288,7 +303,7 @@ export function InboxRoot({
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
 
       {/* ── Left: thread list ───────────────────────────────────────────── */}
-      <div style={{ width: 300, minWidth: 300, borderRight: "1px solid #EBEBEB", display: "flex", flexDirection: "column", overflow: "hidden", background: "#FFFFFF" }}>
+      <div className="inbox-threads" style={{ width: 300, minWidth: 300, borderRight: "1px solid #EBEBEB", display: "flex", flexDirection: "column", overflow: "hidden", background: "#FFFFFF" }}>
 
         {/* Thread list header — now just count */}
         <div style={{ padding: "10px 14px 8px", borderBottom: "1px solid #F0F0F0", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
@@ -417,7 +432,7 @@ export function InboxRoot({
       </div>
 
       {/* ── Center: email view ──────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0, background: "#FAFAF8", position: "relative" }}>
+      <div className="inbox-center" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0, background: "#FAFAF8", position: "relative" }}>
 
         {/* Loading overlay */}
         {isLoading && (
@@ -430,6 +445,21 @@ export function InboxRoot({
           <>
             {/* Thread header */}
             <div style={{ padding: "12px 20px", borderBottom: "1px solid #EBEBEB", flexShrink: 0, background: "#FFFFFF" }}>
+              {/* Back button — mobile only */}
+              <button
+                className="inbox-back-btn"
+                onClick={() => setSelectedId(null)}
+                style={{
+                  alignItems: "center", gap: 5, marginBottom: 10,
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "#2563EB", fontSize: 13, fontWeight: 500, padding: 0,
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+                Back
+              </button>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                 <h2 style={{ margin: "0 0 5px", fontSize: 14, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.35, flex: 1 }}>
                   {selectedThread.subject}
@@ -689,7 +719,7 @@ export function InboxRoot({
 
       {/* ── Right: context panel (toggle with \ or button) ──────────────── */}
       {rightOpen && selectedThread && detail && (
-        <div style={{ width: 296, minWidth: 296, borderLeft: "1px solid #EBEBEB", display: "flex", flexDirection: "column", overflow: "hidden", background: "#FFFFFF" }}>
+        <div className="inbox-right" style={{ width: 296, minWidth: 296, borderLeft: "1px solid #EBEBEB", display: "flex", flexDirection: "column", overflow: "hidden", background: "#FFFFFF" }}>
           <RightContextPanel
             matchedLoad={detail.matchedLoad}
             classification={detail.classification}

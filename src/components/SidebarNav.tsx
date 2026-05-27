@@ -79,6 +79,9 @@ const NAV = [
 function openSearch() {
   window.dispatchEvent(new CustomEvent("clyde:open-search"));
 }
+function navClick() {
+  window.dispatchEvent(new CustomEvent("clyde:nav-click"));
+}
 
 export function SidebarNav({
   inboxCount = 0,
@@ -120,7 +123,7 @@ export function SidebarNav({
 
         {/* Search */}
         <button
-          onClick={openSearch}
+          onClick={() => { navClick(); openSearch(); }}
           title="Search (⌘K)"
           style={{ padding: 8, background: "none", border: "none", cursor: "pointer", color: "#9CA3AF", borderRadius: 6 }}
         >
@@ -137,6 +140,7 @@ export function SidebarNav({
             <div key={href} style={{ position: "relative" }}>
               <Link
                 href={href}
+                onClick={navClick}
                 title={href.split("/").pop()}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -220,6 +224,7 @@ export function SidebarNav({
             <Link
               key={href}
               href={href}
+              onClick={navClick}
               style={{
                 display: "flex", alignItems: "center", gap: 9,
                 padding: "7px 10px", borderRadius: 6,
