@@ -206,19 +206,12 @@ export function InboxRoot({
 
         {/* Header */}
         <div style={{ borderBottom: "1px solid #EBEBEB", flexShrink: 0 }}>
-          <div style={{ padding: "10px 14px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#B0B0B0", textTransform: "uppercase", letterSpacing: "0.9px" }}>
-                Inbox
-              </span>
-              {connection?.lastSyncAt && (
-                <div style={{ fontSize: 9, color: "#D1D5DB", marginTop: 1 }}>
-                  Synced {new Date(connection.lastSyncAt).toLocaleTimeString()}
-                </div>
-              )}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 10, color: "#9CA3AF", background: "#F5F5F5", padding: "2px 7px", borderRadius: 10, fontWeight: 600 }}>
+          <div style={{ padding: "11px 14px 9px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#292929", letterSpacing: "-0.2px" }}>
+              Inbox
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ fontSize: 10, color: "#9CA3AF", background: "#F5F5F5", padding: "1px 6px", borderRadius: 8, fontWeight: 600 }}>
                 {threads.length}
               </span>
               {connection && <SyncButton />}
@@ -226,7 +219,7 @@ export function InboxRoot({
           </div>
 
           {/* Filter tabs */}
-          <div style={{ display: "flex", gap: 0, padding: "0 8px", overflowX: "auto" }}>
+          <div style={{ display: "flex", gap: 0, padding: "0 8px 0", overflowX: "auto" }}>
             {FILTER_TABS.map(({ label, value }) => {
               const active = filter === value;
               const href = value ? `/app/inbox?filter=${value}` : "/app/inbox";
@@ -237,10 +230,10 @@ export function InboxRoot({
                   style={{
                     padding: "5px 7px",
                     fontSize: 11,
-                    fontWeight: 600,
+                    fontWeight: active ? 600 : 400,
                     textDecoration: "none",
                     whiteSpace: "nowrap",
-                    color: active ? "#2563EB" : "#9CA3AF",
+                    color: active ? "#1D4ED8" : "#9CA3AF",
                     borderBottom: active ? "2px solid #2563EB" : "2px solid transparent",
                   }}
                 >
@@ -272,6 +265,7 @@ export function InboxRoot({
             });
             const dotColor = STATUS_DOT[wState] ?? STATUS_DOT[t.status] ?? "#D1D5DB";
             const isUrgent = t.priority === "urgent";
+            const isUnread = ["open", "pending_review"].includes(t.status);
 
             return (
               <button
@@ -281,53 +275,58 @@ export function InboxRoot({
                 style={{ display: "block", width: "100%", textAlign: "left", border: "none", padding: 0, background: "none", cursor: "pointer" }}
               >
                 <div style={{
-                  padding: "9px 12px",
-                  borderBottom: "1px solid #F5F5F5",
+                  padding: "10px 14px 10px 12px",
+                  borderBottom: "1px solid #F2F2F2",
                   background: active ? "#EFF6FF" : "transparent",
                   borderLeft: `3px solid ${active ? "#2563EB" : isUrgent ? PRIORITY_COLOR.urgent : "transparent"}`,
-                  display: "flex",
-                  gap: 9,
-                  alignItems: "flex-start",
                 }}>
-                  {/* Status dot */}
-                  <div style={{
-                    width: 7, height: 7, borderRadius: "50%",
-                    background: dotColor,
-                    marginTop: 5, flexShrink: 0,
-                  }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    {/* Subject */}
+                  {/* Row 1: subject + timestamp */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, marginBottom: 3 }}>
                     <div style={{
-                      fontSize: 12,
-                      fontWeight: active ? 600 : (["open", "pending_review"].includes(t.status) ? 600 : 400),
-                      color: active ? "#1D4ED8" : "#292929",
-                      lineHeight: 1.4, marginBottom: 3,
-                      overflow: "hidden", display: "-webkit-box",
-                      WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                      fontSize: 13,
+                      fontWeight: isUnread || active ? 600 : 400,
+                      color: active ? "#1D4ED8" : isUnread ? "#111827" : "#5D5D5D",
+                      lineHeight: 1.35,
+                      overflow: "hidden",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 1,
+                      WebkitBoxOrient: "vertical" as const,
+                      flex: 1,
                     }}>
+                      {/* Unread dot inline */}
+                      {isUnread && !active && (
+                        <span style={{
+                          display: "inline-block",
+                          width: 6, height: 6, borderRadius: "50%",
+                          background: dotColor,
+                          marginRight: 6, marginBottom: 1,
+                          verticalAlign: "middle",
+                          flexShrink: 0,
+                        }} />
+                      )}
                       {t.subject}
                     </div>
-                    {/* Sender + time */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: cls ? 3 : 0 }}>
-                      <span style={{ fontSize: 11, color: "#7F7F7F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "65%" }}>
-                        {t.customerName ?? t.carrierName ?? "—"}
+                    <span style={{ fontSize: 10, color: "#B0B0B0", whiteSpace: "nowrap", flexShrink: 0, marginTop: 1 }}>
+                      {relativeTime(t.lastMessageAt)}
+                    </span>
+                  </div>
+
+                  {/* Row 2: sender + load ref */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: cls ? 5 : 0 }}>
+                    <span style={{ fontSize: 11, color: "#7F7F7F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                      {t.customerName ?? t.carrierName ?? "—"}
+                    </span>
+                    {cls?.extractedLoadNumber && (
+                      <span style={{ fontSize: 10, color: "#93C5FD", fontFamily: "monospace", whiteSpace: "nowrap", flexShrink: 0 }}>
+                        #{cls.extractedLoadNumber}
                       </span>
-                      <span style={{ fontSize: 10, color: "#C4C4C4", whiteSpace: "nowrap", flexShrink: 0 }}>
-                        {relativeTime(t.lastMessageAt)}
-                      </span>
-                    </div>
-                    {/* Tags */}
-                    {cls && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" as const }}>
-                        <CategoryBadge category={cls.category} />
-                        {cls.extractedLoadNumber && (
-                          <span style={{ fontSize: 10, color: "#C4C4C4", fontFamily: "monospace" }}>
-                            #{cls.extractedLoadNumber}
-                          </span>
-                        )}
-                      </div>
                     )}
                   </div>
+
+                  {/* Row 3: category badge */}
+                  {cls && (
+                    <CategoryBadge category={cls.category} />
+                  )}
                 </div>
               </button>
             );

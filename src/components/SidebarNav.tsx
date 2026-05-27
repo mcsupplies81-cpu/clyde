@@ -62,7 +62,6 @@ const NAV = [
 export function SidebarNav({
   inboxCount = 0,
   inboxEmail = null,
-  companyName = null,
 }: {
   inboxCount?: number;
   inboxEmail?: string | null;
@@ -72,39 +71,25 @@ export function SidebarNav({
 
   return (
     <aside style={{
-      width: 212,
-      minWidth: 212,
-      background: "#FFFFFF",
-      borderRight: "1px solid #E8E8E8",
+      width: 200,
+      minWidth: 200,
+      background: "#16181C",
       display: "flex",
       flexDirection: "column",
       overflow: "hidden",
     }}>
       {/* Logo */}
-      <div style={{ padding: "18px 16px 14px", borderBottom: "1px solid #F2F2F2" }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: "#292929", letterSpacing: "1.5px", textTransform: "uppercase" }}>
+      <div style={{ padding: "20px 16px 16px" }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: "#FFFFFF", letterSpacing: "2px", textTransform: "uppercase" }}>
           CLYDE
         </div>
-        <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 2, letterSpacing: "0.5px" }}>
+        <div style={{ fontSize: 10, color: "#6B7280", marginTop: 2, letterSpacing: "0.3px" }}>
           Freight AI Inbox
         </div>
       </div>
 
-      {/* Inbox status */}
-      <div style={{ padding: "10px 16px", borderBottom: "1px solid #F2F2F2" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: inboxEmail ? "#22C55E" : "#D1D5DB", flexShrink: 0 }} />
-          <span style={{ fontSize: 11, color: "#5D5D5D", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {inboxEmail ?? "No inbox connected"}
-          </span>
-        </div>
-        <div style={{ fontSize: 10, color: "#9CA3AF", paddingLeft: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {companyName ?? "—"}
-        </div>
-      </div>
-
       {/* Nav */}
-      <nav style={{ flex: 1, padding: "6px 8px", overflowY: "auto" }}>
+      <nav style={{ flex: 1, padding: "4px 8px", overflowY: "auto" }}>
         {NAV.map(({ label, href, Icon, badge }) => {
           const active = path.startsWith(href);
           const showCount = badge && inboxCount > 0;
@@ -115,19 +100,21 @@ export function SidebarNav({
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
-                padding: "8px 10px",
+                gap: 9,
+                padding: "7px 10px",
                 borderRadius: 6,
-                color: active ? "#292929" : "#7F7F7F",
-                background: active ? "#EFF6FF" : "transparent",
+                color: active ? "#FFFFFF" : "#8A8F98",
+                background: active ? "rgba(255,255,255,0.08)" : "transparent",
                 textDecoration: "none",
                 fontSize: 13,
                 fontWeight: active ? 600 : 400,
                 marginBottom: 1,
                 position: "relative",
+                transition: "background 0.1s, color 0.1s",
+                borderLeft: active ? "2px solid #3B82F6" : "2px solid transparent",
               }}
             >
-              <span style={{ color: active ? "#2563EB" : "#9CA3AF", flexShrink: 0 }}>
+              <span style={{ color: active ? "#60A5FA" : "#4B5563", flexShrink: 0 }}>
                 <Icon />
               </span>
               <span style={{ flex: 1 }}>{label}</span>
@@ -135,8 +122,8 @@ export function SidebarNav({
                 <span style={{
                   fontSize: 10,
                   fontWeight: 700,
-                  background: "#EFF6FF",
-                  color: "#2563EB",
+                  background: "#3B82F6",
+                  color: "#FFFFFF",
                   padding: "1px 6px",
                   borderRadius: 10,
                   minWidth: 18,
@@ -145,53 +132,28 @@ export function SidebarNav({
                   {inboxCount > 99 ? "99+" : inboxCount}
                 </span>
               )}
-              {active && (
-                <div style={{
-                  position: "absolute",
-                  left: 0,
-                  top: "20%",
-                  bottom: "20%",
-                  width: 2,
-                  background: "#2563EB",
-                  borderRadius: "0 2px 2px 0",
-                }} />
-              )}
             </Link>
           );
         })}
       </nav>
 
-      {/* User card */}
-      <div style={{
-        padding: "12px 14px",
-        borderTop: "1px solid #F2F2F2",
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-      }}>
+      {/* Inbox address footer */}
+      {inboxEmail && (
         <div style={{
-          width: 30,
-          height: 30,
-          borderRadius: 8,
-          background: "#EFF6FF",
-          border: "1px solid #BFDBFE",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 11,
-          fontWeight: 700,
-          color: "#2563EB",
-          flexShrink: 0,
+          padding: "12px 14px",
+          borderTop: "1px solid rgba(255,255,255,0.06)",
         }}>
-          MW
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#292929", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            Marcus Webb
+          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
+            <span style={{ fontSize: 9, color: "#4B5563", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              Inbox active
+            </span>
           </div>
-          <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 1 }}>Operations Lead</div>
+          <div style={{ fontSize: 10, color: "#6B7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {inboxEmail}
+          </div>
         </div>
-      </div>
+      )}
     </aside>
   );
 }

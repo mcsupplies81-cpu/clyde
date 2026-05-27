@@ -3,11 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --bg: #FAFAF8;
+  --bg: #F8F8F7;
   --surface-1: #FFFFFF;
   --surface-2: #F9FAFB;
-  --border: #E8E8E8;
-  --text-primary: #292929;
+  --border: #EBEBEB;
+  --text-primary: #111827;
   --text-secondary: #5D5D5D;
   --text-muted: #9CA3AF;
 }
@@ -21,11 +21,16 @@ body {
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* Light scrollbar for content areas */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 2px; }
+
+/* Dark scrollbar for sidebar */
+aside ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); }
 
 /* ── Inbox responsive layout ─────────────────────────────────────────────── */
 

@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#FAFAF8" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#F8F8F7" }}>
       <SidebarNav
         inboxCount={openCount}
         inboxEmail={inbox?.emailAddress ?? null}
