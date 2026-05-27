@@ -77,7 +77,7 @@ const NAV = [
 ];
 
 function openSearch() {
-  window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
+  window.dispatchEvent(new CustomEvent("clyde:open-search"));
 }
 
 export function SidebarNav({

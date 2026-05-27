@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { SidebarNav } from "./SidebarNav";
+import { SearchModal } from "./SearchModal";
 
 export function AppShell({
   children,
@@ -27,6 +28,7 @@ export function AppShell({
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {children}
       </div>
+      <SearchModal />
     </div>
   );
 }
