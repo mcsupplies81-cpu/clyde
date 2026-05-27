@@ -1,4 +1,4 @@
-import { SidebarNav } from "@/components/SidebarNav";
+import { AppShell } from "@/components/AppShell";
 import { TopBar } from "@/components/TopBar";
 import { db } from "@/db";
 import { emailThreads, inboxes, tenants } from "@/db/schema";
@@ -20,16 +20,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#F8F8F7" }}>
-      <SidebarNav
-        inboxCount={openCount}
-        inboxEmail={inbox?.emailAddress ?? null}
-        companyName={tenant?.name ?? null}
-      />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <TopBar companyName={tenant?.name ?? null} />
-        <main style={{ flex: 1, overflow: "auto" }}>{children}</main>
-      </div>
-    </div>
+    <AppShell
+      inboxCount={openCount}
+      inboxEmail={inbox?.emailAddress ?? null}
+      companyName={tenant?.name ?? null}
+    >
+      <TopBar companyName={tenant?.name ?? null} />
+      <main style={{ flex: 1, overflow: "auto" }}>{children}</main>
+    </AppShell>
   );
 }

@@ -2,6 +2,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+function IconMenu() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  );
+}
+function IconSearch() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
 function IconInbox() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -59,15 +76,91 @@ const NAV = [
   { label: "Settings",  href: "/app/settings",  Icon: IconSettings, badge: false },
 ];
 
+function openSearch() {
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
+}
+
 export function SidebarNav({
   inboxCount = 0,
   inboxEmail = null,
+  collapsed = false,
+  onToggle,
 }: {
   inboxCount?: number;
   inboxEmail?: string | null;
   companyName?: string | null;
+  collapsed?: boolean;
+  onToggle?: () => void;
 }) {
   const path = usePathname();
+
+  if (collapsed) {
+    return (
+      <aside style={{
+        width: 52,
+        minWidth: 52,
+        background: "#FFFFFF",
+        borderRight: "1px solid #EBEBEB",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        overflow: "hidden",
+        transition: "width 0.18s ease",
+        paddingTop: 8,
+        gap: 4,
+      }}>
+        {/* Toggle */}
+        <button
+          onClick={onToggle}
+          title="Expand sidebar"
+          style={{ padding: 8, background: "none", border: "none", cursor: "pointer", color: "#9CA3AF", borderRadius: 6 }}
+        >
+          <IconMenu />
+        </button>
+
+        {/* Search */}
+        <button
+          onClick={openSearch}
+          title="Search (⌘K)"
+          style={{ padding: 8, background: "none", border: "none", cursor: "pointer", color: "#9CA3AF", borderRadius: 6 }}
+        >
+          <IconSearch />
+        </button>
+
+        <div style={{ width: 28, height: 1, background: "#F2F2F2", margin: "4px 0" }} />
+
+        {/* Nav icons */}
+        {NAV.map(({ href, Icon, badge }) => {
+          const active = path.startsWith(href);
+          const showCount = badge && inboxCount > 0;
+          return (
+            <div key={href} style={{ position: "relative" }}>
+              <Link
+                href={href}
+                title={href.split("/").pop()}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 36, height: 36, borderRadius: 8,
+                  background: active ? "#EFF6FF" : "transparent",
+                  color: active ? "#2563EB" : "#9CA3AF",
+                  textDecoration: "none",
+                }}
+              >
+                <Icon />
+              </Link>
+              {showCount && (
+                <div style={{
+                  position: "absolute", top: 2, right: 2,
+                  width: 6, height: 6, borderRadius: "50%",
+                  background: "#2563EB",
+                }} />
+              )}
+            </div>
+          );
+        })}
+      </aside>
+    );
+  }
 
   return (
     <aside style={{
@@ -78,19 +171,48 @@ export function SidebarNav({
       display: "flex",
       flexDirection: "column",
       overflow: "hidden",
+      transition: "width 0.18s ease",
     }}>
-      {/* Logo */}
-      <div style={{ padding: "20px 16px 16px" }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: "#111827", letterSpacing: "1.5px", textTransform: "uppercase" }}>
-          CLYDE
-        </div>
-        <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 2, letterSpacing: "0.3px" }}>
-          Freight AI Inbox
+      {/* Top: toggle + logo */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 12px 10px" }}>
+        <button
+          onClick={onToggle}
+          title="Collapse sidebar"
+          style={{ padding: 6, background: "none", border: "none", cursor: "pointer", color: "#9CA3AF", borderRadius: 6, flexShrink: 0 }}
+        >
+          <IconMenu />
+        </button>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: "#111827", letterSpacing: "1.5px", textTransform: "uppercase", lineHeight: 1 }}>
+            CLYDE
+          </div>
+          <div style={{ fontSize: 9, color: "#9CA3AF", marginTop: 2, letterSpacing: "0.3px" }}>
+            Freight AI Inbox
+          </div>
         </div>
       </div>
 
+      {/* Search button */}
+      <div style={{ padding: "0 8px 8px" }}>
+        <button
+          onClick={openSearch}
+          style={{
+            display: "flex", alignItems: "center", gap: 8,
+            width: "100%", padding: "7px 10px",
+            background: "#F9FAFB", border: "1px solid #EBEBEB",
+            borderRadius: 7, cursor: "pointer", textAlign: "left",
+          }}
+        >
+          <span style={{ color: "#9CA3AF" }}><IconSearch /></span>
+          <span style={{ flex: 1, fontSize: 12, color: "#9CA3AF" }}>Search</span>
+          <span style={{ fontSize: 10, color: "#B0B0B0", background: "#F2F2F2", border: "1px solid #E8E8E8", borderRadius: 3, padding: "1px 5px", fontFamily: "monospace" }}>
+            ⌘K
+          </span>
+        </button>
+      </div>
+
       {/* Nav */}
-      <nav style={{ flex: 1, padding: "4px 8px", overflowY: "auto" }}>
+      <nav style={{ flex: 1, padding: "2px 8px", overflowY: "auto" }}>
         {NAV.map(({ label, href, Icon, badge }) => {
           const active = path.startsWith(href);
           const showCount = badge && inboxCount > 0;
@@ -99,18 +221,13 @@ export function SidebarNav({
               key={href}
               href={href}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 9,
-                padding: "7px 10px",
-                borderRadius: 6,
+                display: "flex", alignItems: "center", gap: 9,
+                padding: "7px 10px", borderRadius: 6,
                 color: active ? "#111827" : "#6B7280",
                 background: active ? "#EFF6FF" : "transparent",
-                textDecoration: "none",
-                fontSize: 13,
+                textDecoration: "none", fontSize: 13,
                 fontWeight: active ? 600 : 400,
                 marginBottom: 1,
-                position: "relative",
                 borderLeft: active ? "2px solid #2563EB" : "2px solid transparent",
               }}
             >
@@ -119,16 +236,7 @@ export function SidebarNav({
               </span>
               <span style={{ flex: 1 }}>{label}</span>
               {showCount && (
-                <span style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  background: "#DBEAFE",
-                  color: "#1D4ED8",
-                  padding: "1px 6px",
-                  borderRadius: 10,
-                  minWidth: 18,
-                  textAlign: "center",
-                }}>
+                <span style={{ fontSize: 10, fontWeight: 700, background: "#DBEAFE", color: "#1D4ED8", padding: "1px 6px", borderRadius: 10, minWidth: 18, textAlign: "center" }}>
                   {inboxCount > 99 ? "99+" : inboxCount}
                 </span>
               )}
@@ -139,10 +247,7 @@ export function SidebarNav({
 
       {/* Inbox address footer */}
       {inboxEmail && (
-        <div style={{
-          padding: "12px 14px",
-          borderTop: "1px solid #F2F2F2",
-        }}>
+        <div style={{ padding: "10px 14px", borderTop: "1px solid #F2F2F2" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
             <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
             <span style={{ fontSize: 9, color: "#9CA3AF", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>

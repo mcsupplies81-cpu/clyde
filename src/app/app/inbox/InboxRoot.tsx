@@ -206,81 +206,98 @@ export function InboxRoot({
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ display: "flex", height: "100%", overflow: "hidden", background: "#FAFAF8" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#F8F8F7" }}>
+
+      {/* ── Full-width top nav — Superhuman style ───────────────────────── */}
+      <div style={{
+        background: "#FFFFFF",
+        borderBottom: "1px solid #EBEBEB",
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        padding: "0 20px",
+        gap: 0,
+        height: 44,
+      }}>
+        {/* Primary tabs: All · Needs Review · Ready to Send · Done */}
+        {PRIMARY_TABS.map(({ label, value }, i) => {
+          const active = filter === value;
+          const href = value ? `/app/inbox?filter=${value}` : "/app/inbox";
+          return (
+            <span key={label} style={{ display: "flex", alignItems: "center" }}>
+              {i > 0 && (
+                <span style={{ color: "#D1D5DB", fontSize: 15, margin: "0 4px", userSelect: "none", lineHeight: 1 }}>·</span>
+              )}
+              <Link
+                href={href}
+                style={{
+                  padding: "4px 6px",
+                  fontSize: 15,
+                  fontWeight: active ? 700 : 400,
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                  color: active ? "#111827" : "#9CA3AF",
+                  borderBottom: active ? "2px solid #111827" : "2px solid transparent",
+                  lineHeight: "36px",
+                }}
+              >
+                {label}
+                {active && threads.length > 0 && (
+                  <span style={{ fontSize: 13, fontWeight: 400, color: "#9CA3AF", marginLeft: 5 }}>
+                    {threads.length}
+                  </span>
+                )}
+              </Link>
+            </span>
+          );
+        })}
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* Secondary filters as smaller chips */}
+        <div style={{ display: "flex", gap: 2, alignItems: "center", overflowX: "auto" }}>
+          {SECONDARY_TABS.map(({ label, value }) => {
+            const active = filter === value;
+            const href = value ? `/app/inbox?filter=${value}` : "/app/inbox";
+            return (
+              <Link
+                key={label}
+                href={href}
+                style={{
+                  padding: "3px 9px",
+                  fontSize: 11,
+                  fontWeight: active ? 600 : 400,
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                  color: active ? "#1D4ED8" : "#B0B0B0",
+                  background: active ? "#EFF6FF" : "transparent",
+                  border: active ? "1px solid #BFDBFE" : "1px solid transparent",
+                  borderRadius: 20,
+                }}
+              >
+                {label}
+              </Link>
+            );
+          })}
+          {connection && <SyncButton />}
+        </div>
+      </div>
+
+      {/* ── Content row ─────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
 
       {/* ── Left: thread list ───────────────────────────────────────────── */}
       <div style={{ width: 300, minWidth: 300, borderRight: "1px solid #EBEBEB", display: "flex", flexDirection: "column", overflow: "hidden", background: "#FFFFFF" }}>
 
-        {/* Header */}
-        <div style={{ borderBottom: "1px solid #EBEBEB", flexShrink: 0 }}>
-          <div style={{ padding: "12px 14px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: "#111827", letterSpacing: "-0.3px" }}>
-                Inbox
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 400, color: "#9CA3AF" }}>
-                {threads.length}
-              </span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              {connection && <SyncButton />}
-            </div>
-          </div>
-
-          {/* Primary filter tabs — large, Superhuman-style */}
-          <div style={{ display: "flex", alignItems: "center", padding: "0 12px", gap: 2, borderBottom: "1px solid #F0F0F0" }}>
-            {PRIMARY_TABS.map(({ label, value }, i) => {
-              const active = filter === value;
-              const href = value ? `/app/inbox?filter=${value}` : "/app/inbox";
-              return (
-                <span key={label} style={{ display: "flex", alignItems: "center" }}>
-                  {i > 0 && (
-                    <span style={{ color: "#E0E0E0", fontSize: 13, margin: "0 1px", userSelect: "none" }}>·</span>
-                  )}
-                  <Link
-                    href={href}
-                    style={{
-                      padding: "7px 5px",
-                      fontSize: 13,
-                      fontWeight: active ? 600 : 400,
-                      textDecoration: "none",
-                      whiteSpace: "nowrap",
-                      color: active ? "#111827" : "#9CA3AF",
-                      borderBottom: active ? "2px solid #111827" : "2px solid transparent",
-                    }}
-                  >
-                    {label}
-                  </Link>
-                </span>
-              );
-            })}
-          </div>
-
-          {/* Secondary filters — smaller, scrollable */}
-          <div style={{ display: "flex", gap: 0, padding: "0 8px", overflowX: "auto", borderBottom: "1px solid #F4F4F4" }}>
-            {SECONDARY_TABS.map(({ label, value }) => {
-              const active = filter === value;
-              const href = value ? `/app/inbox?filter=${value}` : "/app/inbox";
-              return (
-                <Link
-                  key={label}
-                  href={href}
-                  style={{
-                    padding: "4px 6px",
-                    fontSize: 11,
-                    fontWeight: active ? 600 : 400,
-                    textDecoration: "none",
-                    whiteSpace: "nowrap",
-                    color: active ? "#2563EB" : "#C4C4C4",
-                    borderBottom: active ? "2px solid #2563EB" : "2px solid transparent",
-                  }}
-                >
-                  {label}
-                </Link>
-              );
-            })}
-          </div>
+        {/* Thread list header — now just count */}
+        <div style={{ padding: "10px 14px 8px", borderBottom: "1px solid #F0F0F0", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+            {filter ? ([...SECONDARY_TABS, ...PRIMARY_TABS] as { label: string; value: string | undefined }[]).find(t => t.value === filter)?.label ?? "All" : "All"}
+          </span>
+          <span style={{ fontSize: 11, color: "#C4C4C4" }}>{threads.length}</span>
         </div>
+
 
         {/* Thread list */}
         <div style={{ overflowY: "auto", flex: 1 }}>
@@ -684,6 +701,7 @@ export function InboxRoot({
           />
         </div>
       )}
+      </div>{/* end content row */}
     </div>
   );
 }
