@@ -201,6 +201,7 @@ export function InboxRoot({
         case "a": (document.querySelector("[data-shortcut='approve']") as HTMLButtonElement)?.click(); break;
         case "s": (document.querySelector("[data-shortcut='mark-sent']") as HTMLButtonElement)?.click(); break;
         case "r": (document.querySelector("[data-shortcut='resolve']") as HTMLButtonElement)?.click(); break;
+        case "n": window.dispatchEvent(new CustomEvent("clyde:open-reply")); break;
         case "\\": setRightOpen(o => !o); break;
       }
     }
@@ -218,7 +219,7 @@ export function InboxRoot({
       })
     : null;
 
-  const firstInbound = detail?.messages.find((m) => m.direction === "inbound");
+  const firstInbound = detail?.messages?.find((m) => m.direction === "inbound");
   const hasDraft = !!detail?.draft;
   const draftSentOrRejected = detail?.draft?.status === "sent" || detail?.draft?.status === "rejected";
 
@@ -571,7 +572,7 @@ export function InboxRoot({
 
                 {/* Messages */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-                  {detail.messages.map((msg) => {
+                  {(detail.messages ?? []).map((msg) => {
                     const isInbound = msg.direction === "inbound";
                     return (
                       <div key={msg.id} style={{
@@ -818,22 +819,25 @@ export function InboxRoot({
                   </div>
                 )}
 
-                {/* Manual reply composer — always available, skips AI draft */}
-                {(() => {
-                  const lastInbound = [...detail.messages].reverse().find((m) => m.direction === "inbound");
-                  if (!lastInbound) return null;
-                  return (
-                    <ManualReplyComposer
-                      threadId={selectedThread.id}
-                      toEmail={lastInbound.senderEmail}
-                      toName={lastInbound.senderName}
-                      subject={selectedThread.subject}
-                    />
-                  );
-                })()}
 
               </div>
             </div>
+
+            {/* ── Sticky reply footer — always visible, outside scroll area ── */}
+            {(() => {
+              const lastInbound = [...detail.messages].reverse().find((m) => m.direction === "inbound");
+              if (!lastInbound) return null;
+              return (
+                <div style={{ flexShrink: 0, borderTop: "1px solid #EBEBEB", background: "#FAFAF8" }}>
+                  <ManualReplyComposer
+                    threadId={selectedThread.id}
+                    toEmail={lastInbound.senderEmail}
+                    toName={lastInbound.senderName}
+                    subject={selectedThread.subject}
+                  />
+                </div>
+              );
+            })()}
           </>
         ) : !isLoading ? (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#C4C4C4", fontSize: 13 }}>

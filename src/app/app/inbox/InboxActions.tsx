@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useActionState, useRef } from "react";
+import { useState, useEffect, useCallback, useActionState, useTransition, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
@@ -505,7 +505,8 @@ export function SaveAttachmentButton({
 }
 
 // ─── Manual reply composer ────────────────────────────────────────────────────
-// Lets the broker write a reply directly — no AI draft needed.
+// Always visible as a sticky footer. Supports unlimited sequential sends.
+// Opens via "↩ Reply" button or keyboard shortcut N.
 
 export function ManualReplyComposer({
   threadId,
@@ -519,30 +520,60 @@ export function ManualReplyComposer({
   subject: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [result, setResult] = useState<{ success?: boolean; error?: string } | null>(null);
+  const [sentCount, setSentCount] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [state, formAction, pending] = useActionState(sendManualReplyAction, undefined);
+  const formRef = useRef<HTMLFormElement>(null);
 
-  // Close on success + focus textarea on open
+  // Focus textarea when opening
   useEffect(() => {
-    if (state?.success) setOpen(false);
-  }, [state?.success]);
-
-  useEffect(() => {
-    if (open) setTimeout(() => textareaRef.current?.focus(), 50);
+    if (open) setTimeout(() => textareaRef.current?.focus(), 60);
   }, [open]);
+
+  // Listen for keyboard shortcut N (dispatched by InboxRoot)
+  useEffect(() => {
+    function onOpenReply() { setOpen(true); }
+    window.addEventListener("clyde:open-reply", onOpenReply);
+    return () => window.removeEventListener("clyde:open-reply", onOpenReply);
+  }, []);
+
+  // Auto-clear success flash after 3 s
+  useEffect(() => {
+    if (!result?.success) return;
+    const t = setTimeout(() => setResult(null), 3000);
+    return () => clearTimeout(t);
+  }, [result?.success, sentCount]);
 
   const reSubject = subject.startsWith("Re:") || subject.startsWith("RE:") ? subject : `Re: ${subject}`;
 
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    startTransition(async () => {
+      const res = await sendManualReplyAction(undefined, formData);
+      setResult(res ?? null);
+      if (res?.success) {
+        form.reset();
+        setSentCount((c) => c + 1);
+        // Stay open so user can send another email immediately
+        setTimeout(() => textareaRef.current?.focus(), 60);
+      }
+    });
+  }
+
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div style={{ padding: "10px 20px 12px" }}>
       {!open ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
             type="button"
+            data-shortcut="reply"
             onClick={() => setOpen(true)}
             style={{
               display: "inline-flex", alignItems: "center", gap: 6,
-              padding: "8px 16px",
+              padding: "7px 16px",
               background: "#F5F5F5",
               border: "1px solid #E8E8E8",
               borderRadius: 6,
@@ -552,9 +583,10 @@ export function ManualReplyComposer({
               cursor: "pointer",
             }}
           >
-            ↩ Reply manually
+            ↩ Reply
           </button>
-          {state?.success && (
+          <kbd style={{ fontSize: 10, background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 3, padding: "1px 5px", color: "#9CA3AF", fontFamily: "monospace" }}>N</kbd>
+          {result?.success && (
             <span style={{ fontSize: 12, color: "#16A34A", fontWeight: 500 }}>✓ Reply sent</span>
           )}
         </div>
@@ -564,18 +596,21 @@ export function ManualReplyComposer({
           border: "1px solid #DBEAFE",
           borderRadius: 8,
           overflow: "hidden",
-          boxShadow: "0 2px 8px rgba(37, 99, 235, 0.08)",
+          boxShadow: "0 2px 10px rgba(37, 99, 235, 0.09)",
         }}>
           {/* Composer header */}
           <div style={{
-            padding: "8px 14px",
+            padding: "7px 14px",
             background: "#EFF6FF",
             borderBottom: "1px solid #DBEAFE",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
           }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#2563EB" }}>↩ Reply</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#2563EB" }}>
+              ↩ Reply to {toName ?? toEmail}
+              {toName && <span style={{ fontWeight: 400, color: "#93C5FD", marginLeft: 5 }}>&lt;{toEmail}&gt;</span>}
+            </span>
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -585,17 +620,10 @@ export function ManualReplyComposer({
             </button>
           </div>
 
-          <form action={formAction} style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+          <form ref={formRef} onSubmit={handleSubmit} style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
             <input type="hidden" name="threadId" value={threadId} />
             <input type="hidden" name="to"       value={toEmail} />
             <input type="hidden" name="subject"  value={reSubject} />
-
-            {/* To + subject meta */}
-            <div style={{ fontSize: 11, color: "#6B7280", borderBottom: "1px solid #F0F0F0", paddingBottom: 7 }}>
-              <span style={{ fontWeight: 600, marginRight: 5, color: "#9CA3AF" }}>To:</span>
-              <span style={{ color: "#374151" }}>{toName ?? toEmail}</span>
-              {toName && <span style={{ color: "#C4C4C4", marginLeft: 4 }}>&lt;{toEmail}&gt;</span>}
-            </div>
 
             {/* Body */}
             <textarea
@@ -603,7 +631,7 @@ export function ManualReplyComposer({
               name="body"
               required
               placeholder="Write your reply…"
-              rows={5}
+              rows={4}
               style={{
                 width: "100%",
                 border: "none",
@@ -622,19 +650,19 @@ export function ManualReplyComposer({
             <div style={{ display: "flex", gap: 8, borderTop: "1px solid #F0F0F0", paddingTop: 8, alignItems: "center" }}>
               <button
                 type="submit"
-                disabled={pending}
+                disabled={isPending}
                 style={{
                   padding: "7px 18px",
-                  background: pending ? "#9CA3AF" : "#2563EB",
+                  background: isPending ? "#9CA3AF" : "#2563EB",
                   color: "#FFFFFF",
                   border: "none",
                   borderRadius: 5,
                   fontSize: 12,
                   fontWeight: 700,
-                  cursor: pending ? "wait" : "pointer",
+                  cursor: isPending ? "wait" : "pointer",
                 }}
               >
-                {pending ? "Sending…" : "Send"}
+                {isPending ? "Sending…" : "Send"}
               </button>
               <button
                 type="button"
@@ -649,10 +677,15 @@ export function ManualReplyComposer({
                   cursor: "pointer",
                 }}
               >
-                Cancel
+                Close
               </button>
-              {state?.error && (
-                <span style={{ fontSize: 11, color: "#DC2626", marginLeft: 4 }}>{state.error}</span>
+              {result?.success && (
+                <span style={{ fontSize: 11, color: "#16A34A", fontWeight: 600, marginLeft: 4 }}>
+                  ✓ Sent — write another?
+                </span>
+              )}
+              {result?.error && (
+                <span style={{ fontSize: 11, color: "#DC2626", marginLeft: 4 }}>{result.error}</span>
               )}
             </div>
           </form>
@@ -673,6 +706,7 @@ export function ShortcutHint() {
         ["A", "Approve"],
         ["S", "Mark Sent"],
         ["R", "Resolve"],
+        ["N", "Reply"],
       ].map(([key, label]) => (
         <span key={key} style={{ fontSize: 10, color: "#9CA3AF", display: "flex", alignItems: "center", gap: 4 }}>
           <kbd style={{ background: "#F9FAFB", border: "1px solid #E8E8E8", borderRadius: 3, padding: "0 4px", fontFamily: "monospace", fontSize: 9, color: "#5D5D5D" }}>{key}</kbd>

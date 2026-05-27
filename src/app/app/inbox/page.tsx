@@ -145,7 +145,11 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     );
   }
 
-  const validFilters: InboxFilter[] = ["all", "needs_review", "ready_to_send", "sent", "escalated", "resolved", "pod_request", "bol_request", "quote_request", "status_request", "appointment_change"];
+  const validFilters: InboxFilter[] = [
+    "all", "needs_review", "ready_to_send", "sent", "escalated", "resolved",
+    "urgent", "carrier_concern",
+    "pod_request", "bol_request", "quote_request", "status_request", "appointment_change",
+  ];
   const filter = validFilters.includes(rawFilter as InboxFilter) ? (rawFilter as InboxFilter) : undefined;
 
   // Fetch thread list (cached) + connection in parallel
