@@ -29,8 +29,6 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 2px; }
 
-/* Dark scrollbar for sidebar */
-aside ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); }
 
 /* ── Inbox responsive layout ─────────────────────────────────────────────── */
 

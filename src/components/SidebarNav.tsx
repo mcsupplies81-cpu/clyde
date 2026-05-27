@@ -73,17 +73,18 @@ export function SidebarNav({
     <aside style={{
       width: 200,
       minWidth: 200,
-      background: "#16181C",
+      background: "#FFFFFF",
+      borderRight: "1px solid #EBEBEB",
       display: "flex",
       flexDirection: "column",
       overflow: "hidden",
     }}>
       {/* Logo */}
       <div style={{ padding: "20px 16px 16px" }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: "#FFFFFF", letterSpacing: "2px", textTransform: "uppercase" }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: "#111827", letterSpacing: "1.5px", textTransform: "uppercase" }}>
           CLYDE
         </div>
-        <div style={{ fontSize: 10, color: "#6B7280", marginTop: 2, letterSpacing: "0.3px" }}>
+        <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 2, letterSpacing: "0.3px" }}>
           Freight AI Inbox
         </div>
       </div>
@@ -103,18 +104,17 @@ export function SidebarNav({
                 gap: 9,
                 padding: "7px 10px",
                 borderRadius: 6,
-                color: active ? "#FFFFFF" : "#8A8F98",
-                background: active ? "rgba(255,255,255,0.08)" : "transparent",
+                color: active ? "#111827" : "#6B7280",
+                background: active ? "#EFF6FF" : "transparent",
                 textDecoration: "none",
                 fontSize: 13,
                 fontWeight: active ? 600 : 400,
                 marginBottom: 1,
                 position: "relative",
-                transition: "background 0.1s, color 0.1s",
-                borderLeft: active ? "2px solid #3B82F6" : "2px solid transparent",
+                borderLeft: active ? "2px solid #2563EB" : "2px solid transparent",
               }}
             >
-              <span style={{ color: active ? "#60A5FA" : "#4B5563", flexShrink: 0 }}>
+              <span style={{ color: active ? "#2563EB" : "#9CA3AF", flexShrink: 0 }}>
                 <Icon />
               </span>
               <span style={{ flex: 1 }}>{label}</span>
@@ -122,8 +122,8 @@ export function SidebarNav({
                 <span style={{
                   fontSize: 10,
                   fontWeight: 700,
-                  background: "#3B82F6",
-                  color: "#FFFFFF",
+                  background: "#DBEAFE",
+                  color: "#1D4ED8",
                   padding: "1px 6px",
                   borderRadius: 10,
                   minWidth: 18,
@@ -141,15 +141,15 @@ export function SidebarNav({
       {inboxEmail && (
         <div style={{
           padding: "12px 14px",
-          borderTop: "1px solid rgba(255,255,255,0.06)",
+          borderTop: "1px solid #F2F2F2",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
             <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
-            <span style={{ fontSize: 9, color: "#4B5563", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            <span style={{ fontSize: 9, color: "#9CA3AF", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
               Inbox active
             </span>
           </div>
-          <div style={{ fontSize: 10, color: "#6B7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: 10, color: "#B0B0B0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {inboxEmail}
           </div>
         </div>
