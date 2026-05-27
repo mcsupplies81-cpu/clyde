@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { WorkflowBadge } from "@/components/StatusBadge";
 import { CategoryBadge } from "@/components/CategoryBadge";
@@ -117,7 +117,11 @@ export function InboxRoot({
   const [detail, setDetail] = useState<ThreadDetail | null>(initialDetail);
   const [isLoading, setIsLoading] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [customerFilter, setCustomerFilter] = useState<string>("all");
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const abortRef = useRef<AbortController | null>(null);
+  const filterPanelRef = useRef<HTMLDivElement>(null);
 
   // Keep a ref so effects can read the latest selectedId without stale closures
   const selectedIdRef = useRef(selectedId);
@@ -162,10 +166,41 @@ export function InboxRoot({
     }
   }, [selectedId, filter]);
 
-  // Background prefetch next 6 threads after mount
-  const threadIds = threads.map((t) => t.id);
+  // Close filter panel when clicking outside
   useEffect(() => {
-    const toPreload = threadIds.filter((id) => id !== initialSelectedId).slice(0, 6);
+    function onClickOutside(e: MouseEvent) {
+      if (filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setFilterPanelOpen(false);
+      }
+    }
+    if (filterPanelOpen) document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [filterPanelOpen]);
+
+  // Unique customers/carriers from the current thread list
+  const inboxCustomers = useMemo(() => {
+    const names = threads
+      .map((t) => t.customerName ?? t.carrierName)
+      .filter(Boolean) as string[];
+    return [...new Set(names)].sort();
+  }, [threads]);
+
+  // Client-side filtered view of threads (customer + priority)
+  const filteredThreads = useMemo(() => {
+    return threads.filter((t) => {
+      const passCustomer = customerFilter === "all" || (t.customerName ?? t.carrierName) === customerFilter;
+      const passPriority = priorityFilter === "all" || t.priority === priorityFilter;
+      return passCustomer && passPriority;
+    });
+  }, [threads, customerFilter, priorityFilter]);
+
+  const activeFilterCount = (customerFilter !== "all" ? 1 : 0) + (priorityFilter !== "all" ? 1 : 0);
+
+  // Background prefetch next 6 threads after mount
+  const threadIds = filteredThreads.map((t) => t.id);
+  const allThreadIds = threads.map((t) => t.id);
+  useEffect(() => {
+    const toPreload = allThreadIds.filter((id) => id !== initialSelectedId).slice(0, 6);
     let cancelled = false;
     (async () => {
       for (const id of toPreload) {
@@ -278,9 +313,9 @@ export function InboxRoot({
                 }}
               >
                 {label}
-                {active && threads.length > 0 && (
+                {active && filteredThreads.length > 0 && (
                   <span style={{ fontSize: 13, fontWeight: 400, color: "#9CA3AF", marginLeft: 5 }}>
-                    {threads.length}
+                    {filteredThreads.length}
                   </span>
                 )}
               </Link>
@@ -316,6 +351,106 @@ export function InboxRoot({
               </Link>
             );
           })}
+          {/* Filters dropdown */}
+          <div style={{ position: "relative", marginLeft: 4 }} ref={filterPanelRef}>
+            <button
+              type="button"
+              onClick={() => setFilterPanelOpen((o) => !o)}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                padding: "3px 9px",
+                background: activeFilterCount > 0 ? "#EFF6FF" : "transparent",
+                border: `1px solid ${activeFilterCount > 0 ? "#BFDBFE" : "transparent"}`,
+                borderRadius: 20,
+                fontSize: 11,
+                fontWeight: activeFilterCount > 0 ? 600 : 400,
+                color: activeFilterCount > 0 ? "#2563EB" : "#B0B0B0",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="4" y1="6" x2="20" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="11" y1="18" x2="13" y2="18" />
+              </svg>
+              Filters
+              {activeFilterCount > 0 && (
+                <span style={{
+                  background: "#2563EB", color: "#FFFFFF",
+                  borderRadius: "50%", width: 14, height: 14,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 8, fontWeight: 700,
+                }}>
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+
+            {filterPanelOpen && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50,
+                background: "#FFFFFF", border: "1px solid #E8E8E8",
+                borderRadius: 10, boxShadow: "0 4px 20px rgba(0,0,0,0.10)",
+                padding: 14, minWidth: 220,
+              }}>
+                {/* Customer / company */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 7 }}>
+                    Customer / Company
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 1, maxHeight: 160, overflowY: "auto" }}>
+                    {["all", ...inboxCustomers].map((c) => (
+                      <button key={c} type="button" onClick={() => setCustomerFilter(c)} style={{
+                        textAlign: "left", background: customerFilter === c ? "#EFF6FF" : "none",
+                        border: "none", borderRadius: 5, padding: "5px 8px",
+                        fontSize: 12, color: customerFilter === c ? "#2563EB" : "#374151",
+                        fontWeight: customerFilter === c ? 600 : 400, cursor: "pointer",
+                      }}>
+                        {c === "all" ? "All companies" : c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Priority / Temperature */}
+                <div style={{ borderTop: "1px solid #F2F2F2", paddingTop: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 7 }}>
+                    Priority
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {[
+                      { label: "All",    value: "all",    color: "#6B7280", bg: "#F9FAFB", border: "#E8E8E8" },
+                      { label: "🔥 Urgent", value: "urgent", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
+                      { label: "High",   value: "high",   color: "#EA580C", bg: "#FFF7ED", border: "#FED7AA" },
+                      { label: "Normal", value: "normal", color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE" },
+                    ].map(({ label, value, color, bg, border }) => (
+                      <button key={value} type="button" onClick={() => setPriorityFilter(value)} style={{
+                        border: `1px solid ${priorityFilter === value ? border : "#E8E8E8"}`,
+                        background: priorityFilter === value ? bg : "#FAFAFA",
+                        color: priorityFilter === value ? color : "#6B7280",
+                        borderRadius: 20, padding: "3px 10px",
+                        fontSize: 11, fontWeight: priorityFilter === value ? 600 : 400, cursor: "pointer",
+                      }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Clear */}
+                {activeFilterCount > 0 && (
+                  <div style={{ borderTop: "1px solid #F2F2F2", paddingTop: 10, marginTop: 12 }}>
+                    <button type="button" onClick={() => { setCustomerFilter("all"); setPriorityFilter("all"); setFilterPanelOpen(false); }} style={{
+                      fontSize: 11, color: "#DC2626", background: "none", border: "none",
+                      cursor: "pointer", padding: 0, fontWeight: 600,
+                    }}>
+                      Clear filters
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {connection && <SyncButton />}
         </div>
       </div>
@@ -331,18 +466,19 @@ export function InboxRoot({
           <span style={{ fontSize: 11, fontWeight: 600, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.6px" }}>
             {filter ? ([...SECONDARY_TABS, ...PRIMARY_TABS] as { label: string; value: string | undefined }[]).find(t => t.value === filter)?.label ?? "All" : "All"}
           </span>
-          <span style={{ fontSize: 11, color: "#C4C4C4" }}>{threads.length}</span>
+            <span style={{ fontSize: 11, color: "#C4C4C4" }}>
+            {activeFilterCount > 0 ? `${filteredThreads.length} of ${threads.length}` : threads.length}
+          </span>
         </div>
-
 
         {/* Thread list */}
         <div style={{ overflowY: "auto", flex: 1 }}>
-          {threads.length === 0 && (
+          {filteredThreads.length === 0 && (
             <div style={{ padding: "48px 16px", textAlign: "center", color: "#C4C4C4", fontSize: 12 }}>
-              No threads here
+              {activeFilterCount > 0 ? "No threads match your filters" : "No threads here"}
             </div>
           )}
-          {threads.map((t) => {
+          {filteredThreads.map((t) => {
             const active = t.id === selectedId;
             const firstMsg = firstMsgByThread[t.id];
             const cls = firstMsg ? clsByMsg[firstMsg.id] : null;
