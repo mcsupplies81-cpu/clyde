@@ -9,6 +9,7 @@ import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { fmtDate, fmtDateTime, fmtCurrency, etaLabel, statusProgress } from "@/lib/format";
 import { actionLabel } from "@/lib/workflow";
+import { ChaseDocumentButton } from "./ChaseDocumentButton";
 
 const REQUIRED_DOCS = ["BOL", "POD", "Rate Confirmation", "Invoice", "Lumper Receipt"];
 const STATUS_OPTIONS = ["Booked", "Dispatched", "At Pickup", "In Transit", "Out for Delivery", "Delivered", "Exception"];
@@ -124,6 +125,15 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
     (dt) => !docs.some((d) => d.documentType.toLowerCase().includes(dt.toLowerCase())),
   );
 
+  // Try to find carrier email from related thread inbound messages
+  // Heuristic: prefer senders whose email domain differs from customer email pattern,
+  // or just use the most recent inbound sender from carrier-named threads
+  const carrierThread = relatedThreadsRaw.find((t) => t.carrierName === load.carrierName);
+  const carrierMsg = carrierThread
+    ? threadMsgs.find((m) => m.threadId === carrierThread.id && m.direction === "inbound")
+    : null;
+  const carrierEmail = carrierMsg?.senderEmail ?? null;
+
   const eta      = etaLabel(load.eta);
   const progress = statusProgress(load.currentStatus);
 
@@ -153,6 +163,39 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
           ← Load Board
         </Link>
       </div>
+
+      {/* POD chase banner — show when POD missing and load is active/delivered */}
+      {missingDocs.includes("POD") && ["In Transit", "Delivered", "Out for Delivery"].some(
+        (s) => load.currentStatus?.toLowerCase().includes(s.toLowerCase())
+      ) && (
+        <div style={{
+          marginBottom: 14,
+          background: "#FFFBEB",
+          border: "1px solid #FDE68A",
+          borderLeft: "3px solid #F59E0B",
+          borderRadius: "0 8px 8px 0",
+          padding: "10px 16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#92400E" }}>⚠ POD Missing</div>
+            <div style={{ fontSize: 11, color: "#B45309", marginTop: 2 }}>
+              Load is {load.currentStatus} — chase carrier for proof of delivery to unblock billing.
+            </div>
+          </div>
+          <ChaseDocumentButton
+            loadId={load.id}
+            loadNumber={load.loadNumber}
+            docType="POD"
+            carrierName={load.carrierName}
+            defaultCarrierEmail={carrierEmail}
+          />
+        </div>
+      )}
 
       {/* Hero */}
       <div style={{ background: "#FFFFFF", border: "1px solid #E8E8E8", borderRadius: 10, padding: "18px 22px", marginBottom: 20 }}>
@@ -302,24 +345,30 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
             {missingDocs.length > 0 && (
               <div>
                 <div style={{ fontSize: 10, color: "#9CA3AF", marginBottom: 8 }}>Missing documents:</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {missingDocs.map((dt) => (
-                    <div
-                      key={dt}
-                      style={{
+                    <div key={dt}>
+                      <div style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 6,
-                        padding: "5px 10px",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        padding: "7px 10px",
                         background: "#FFF7ED",
                         border: "1px solid #FED7AA",
                         borderRadius: 5,
-                      }}
-                    >
-                      <span style={{ fontSize: 11, color: "#EA580C" }}>Missing: {dt}</span>
-                      <button type="button" style={{ fontSize: 10, color: "#2563EB", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                        Request →
-                      </button>
+                      }}>
+                        <span style={{ fontSize: 11, color: "#EA580C", fontWeight: 600 }}>
+                          ⚠ Missing: {dt}
+                        </span>
+                        <ChaseDocumentButton
+                          loadId={load.id}
+                          loadNumber={load.loadNumber}
+                          docType={dt}
+                          carrierName={load.carrierName}
+                          defaultCarrierEmail={carrierEmail}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
