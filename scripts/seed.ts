@@ -235,6 +235,136 @@ async function main() {
         { direction: "inbound", senderName: "Driver - Maria Santos", senderEmail: "msantos@redlineexpress.com", recipientEmail: "ops@harborfreight.demo", body: "Attached is the lumper receipt for HFB-3422 at Memphis. Cost was $225. Please advance this to me or let me know how it will be processed. Thanks.", hoursAgo: 20 },
       ],
     },
+
+    // --- NEW RICH SCENARIOS ---
+
+    {
+      subject: "POD attached — HFB-3422 Memphis delivery",
+      carrierName: "Redline Express",
+      status: "resolved",
+      priority: "normal",
+      loadNumber: "HFB-3422",
+      messages: [
+        { direction: "inbound", senderName: "Dispatch - Redline Express", senderEmail: "dispatch@redlineexpress.com", recipientEmail: "ops@harborfreight.demo", body: "Hi Harbor Freight team,\n\nPlease find attached the signed POD for load HFB-3422. Delivered to Memphis yesterday at 11:42 AM. Consignee signed without exceptions.\n\nAttachments:\n- POD_HFB3422_signed.pdf\n\nLet us know if you need anything else.", hoursAgo: 16 },
+        { direction: "outbound", senderName: "Ray Okafor", senderEmail: "ray@harborfreight.demo", recipientEmail: "dispatch@redlineexpress.com", body: "Got it — thank you Maria. POD received and logged. Great work on this load.", hoursAgo: 15 },
+      ],
+    },
+
+    {
+      subject: "Driver not responding — HFB-3430",
+      carrierName: "Blue Ridge Transport",
+      status: "escalated",
+      priority: "urgent",
+      loadNumber: "HFB-3430",
+      messages: [
+        { direction: "inbound", senderName: "Yard Manager - SE Lumber", senderEmail: "yard@selumber.com", recipientEmail: "ops@harborfreight.demo", body: "It is now 4:30pm and the driver for HFB-3430 still has not arrived. We cannot reach the driver on the number you provided. Our receiving dock closes at 6pm and we will NOT be available after hours. If this truck is not here by 5:30pm we are refusing the delivery and you will be responsible for redelivery costs.", hoursAgo: 0.5 },
+        { direction: "inbound", senderName: "Rosa Kim", senderEmail: "rkim@blueridgetransport.com", recipientEmail: "ops@harborfreight.demo", body: "Hi — this is Rosa, driver on HFB-3430. My GPS took me to the wrong gate. I am at the facility but the guard is not letting me in. Someone from the consignee needs to authorize me at Gate 4.", hoursAgo: 0.25 },
+      ],
+    },
+
+    {
+      subject: "Rate confirmation request — HFB-3429 Seattle to Denver",
+      carrierName: "Redline Express",
+      status: "open",
+      priority: "normal",
+      loadNumber: "HFB-3429",
+      messages: [
+        { direction: "outbound", senderName: "Danielle Torres", senderEmail: "danielle@harborfreight.demo", recipientEmail: "ops@redlineexpress.com", body: "Hi Redline team,\n\nPlease find the rate confirmation attached for load HFB-3429:\n\n- Lane: Seattle, WA → Denver, CO\n- Equipment: Dry Van 53'\n- Rate: $2,700 all-in\n- Pickup: Thursday\n\nPlease sign and return. Driver assignment needed by tomorrow EOD.", hoursAgo: 6 },
+        { direction: "inbound", senderName: "Ops - Redline Express", senderEmail: "ops@redlineexpress.com", recipientEmail: "ops@harborfreight.demo", body: "Rate con received. Signed and attached — HFB-3429_ratecon_signed.pdf. Driver assigned: Tony Wu, cell 206-555-0317. He will confirm pickup time tomorrow morning.", hoursAgo: 4 },
+      ],
+    },
+
+    {
+      subject: "Damage claim — HFB-3428 freight improperly loaded",
+      customerName: "Midwest Auto Parts",
+      status: "escalated",
+      priority: "urgent",
+      loadNumber: "HFB-3428",
+      messages: [
+        { direction: "inbound", senderName: "Greg Nelson", senderEmail: "gnelson@midwestauto.com", recipientEmail: "ops@harborfreight.demo", body: "Following up on the rejected load HFB-3428. We have completed our inspection and the damage is significant. 14 pallets of transmission components are a total loss due to improper blocking and bracing by the carrier. I am attaching photos (damage_hfb3428_001.jpg through 005.jpg).\n\nEstimated loss: $47,000. We are initiating a formal freight claim and will be withholding payment of your invoice until resolved. Please provide your cargo insurance certificate and claim contact immediately.", hoursAgo: 3 },
+        { direction: "outbound", senderName: "Marcus Webb", senderEmail: "marcus@harborfreight.demo", recipientEmail: "gnelson@midwestauto.com", body: "Mr. Nelson,\n\nI've received your documentation and I understand the severity. I am opening a formal claim with FastLane Inc's cargo insurer today. Claim reference will be provided within 2 hours.\n\nOur cargo insurance certificate is attached. I will be your direct contact throughout this process.\n\nMarcus Webb\nOperations Lead, Harbor Freight Brokerage\n214-555-0001", hoursAgo: 2.5 },
+        { direction: "inbound", senderName: "Greg Nelson", senderEmail: "gnelson@midwestauto.com", recipientEmail: "ops@harborfreight.demo", body: "Thank you Marcus. Awaiting the claim reference number. Our production line is at a standstill — any way to expedite a replacement load from our supplier in Indianapolis? Same spec, same route.", hoursAgo: 2 },
+      ],
+    },
+
+    {
+      subject: "Carrier insurance expiring — FastLane Inc",
+      carrierName: "FastLane Inc",
+      status: "open",
+      priority: "high",
+      messages: [
+        { direction: "inbound", senderName: "Compliance - FastLane Inc", senderEmail: "compliance@fastlaneinc.com", recipientEmail: "ops@harborfreight.demo", body: "Hi Harbor Freight,\n\nOur cargo insurance renewed this week. Please find the updated certificate of insurance attached (COI_FastLane_2026.pdf). The new policy is effective 5/20/2026 and runs through 5/19/2027.\n\nPlease update your records. Let us know if your compliance team needs anything else.", hoursAgo: 48 },
+        { direction: "outbound", senderName: "Danielle Torres", senderEmail: "danielle@harborfreight.demo", recipientEmail: "compliance@fastlaneinc.com", body: "Hi FastLane,\n\nThank you — we have received and logged the updated COI. Your carrier profile is now current through May 2027.\n\nDanielle\nHarbor Freight Brokerage", hoursAgo: 46 },
+      ],
+    },
+
+    {
+      subject: "New lane inquiry — weekly reefer Chicago to Dallas",
+      customerName: "Acme Foods Inc",
+      status: "open",
+      priority: "normal",
+      messages: [
+        { direction: "inbound", senderName: "Procurement - Acme Foods", senderEmail: "procurement@acmefoods.com", recipientEmail: "ops@harborfreight.demo", body: "Hi,\n\nWe are looking to add a new weekly lane: Chicago IL to Dallas TX, reefer, approximately 40,000 lbs. Commodity is frozen meals, temp set at 0°F. We'd need 2 loads per week with pickups on Tuesdays and Fridays.\n\nWe currently use two other brokers for this lane. Can Harbor Freight be competitive? Looking for a rate to compare.", hoursAgo: 10 },
+      ],
+    },
+
+    {
+      subject: "Appointment confirmed — HFB-3426 Friday 11am",
+      customerName: "Southeast Lumber",
+      status: "resolved",
+      priority: "normal",
+      loadNumber: "HFB-3426",
+      messages: [
+        { direction: "outbound", senderName: "Danielle Torres", senderEmail: "danielle@harborfreight.demo", recipientEmail: "purchasing@selumber.com", body: "Hi SE Lumber team,\n\nI've confirmed with Titan Trucking — the driver can accommodate your requested Friday 10am–2pm window for HFB-3426. New appointment is Friday, 11:00 AM delivery. ETA has been updated accordingly.\n\nDriver Dwayne Ellis will call 30 minutes before arrival.\n\nThanks for your flexibility.\n\nDanielle\nHarbor Freight Brokerage", hoursAgo: 1.5 },
+        { direction: "inbound", senderName: "Purchasing - Southeast Lumber", senderEmail: "purchasing@selumber.com", recipientEmail: "ops@harborfreight.demo", body: "Perfect — Friday 11am works. We're all set on our end. Thanks for the quick turnaround.", hoursAgo: 1 },
+      ],
+    },
+
+    {
+      subject: "Check call — HFB-3421 Dallas in transit",
+      carrierName: "Titan Trucking",
+      status: "resolved",
+      priority: "normal",
+      loadNumber: "HFB-3421",
+      messages: [
+        { direction: "inbound", senderName: "James Polk", senderEmail: "jpolk@titantrucking.com", recipientEmail: "ops@harborfreight.demo", body: "Check call — HFB-3421. Currently I-20 eastbound near Shreveport, LA. Running about 90 minutes behind due to traffic slowdown. New ETA Atlanta delivery ~5:30pm instead of 2pm. Freight is secure and reefer is holding temp at 36°F.", hoursAgo: 3 },
+        { direction: "outbound", senderName: "Ray Okafor", senderEmail: "ray@harborfreight.demo", recipientEmail: "jpolk@titantrucking.com", body: "James — got it, logged. I'll notify the customer. Please send another check call when you cross into Alabama.", hoursAgo: 2.8 },
+        { direction: "inbound", senderName: "James Polk", senderEmail: "jpolk@titantrucking.com", recipientEmail: "ops@harborfreight.demo", body: "Crossed into Alabama. On track now — ETA still 5:30pm Atlanta. Traffic cleared up.", hoursAgo: 1 },
+      ],
+    },
+
+    {
+      subject: "Double-broker concern — load HFB-3427",
+      carrierName: "Atlas Freight",
+      status: "pending_review",
+      priority: "high",
+      loadNumber: "HFB-3427",
+      messages: [
+        { direction: "inbound", senderName: "Ops - Atlas Freight", senderEmail: "ops@atlasfreight.com", recipientEmail: "ops@harborfreight.demo", body: "Hi Harbor Freight. We need to re-broker load HFB-3427 to one of our partner carriers due to a truck breakdown. We'd move it to Southern Star Transport, MC# 987654. Is this acceptable? We can have a replacement truck there within 3 hours.", hoursAgo: 2 },
+      ],
+    },
+
+    {
+      subject: "Invoice — HFB-3422 final billing",
+      carrierName: "Redline Express",
+      status: "open",
+      priority: "low",
+      loadNumber: "HFB-3422",
+      messages: [
+        { direction: "inbound", senderName: "AR - Redline Express", senderEmail: "ar@redlineexpress.com", recipientEmail: "ops@harborfreight.demo", body: "Harbor Freight — please find attached our final invoice for load HFB-3422:\n\nLine-haul: $3,100.00\nLumper advance: $225.00\nFuel Surcharge: $186.00\nTotal Due: $3,511.00\n\nNet 30 terms per our carrier agreement. Please remit to the bank details on file. Invoice #RE-20260524-882.", hoursAgo: 14 },
+      ],
+    },
+
+    {
+      subject: "Tracking link request — HFB-3425 pickup tomorrow",
+      customerName: "Acme Foods Inc",
+      status: "open",
+      priority: "low",
+      loadNumber: "HFB-3425",
+      messages: [
+        { direction: "inbound", senderName: "Night Ops - Acme Foods", senderEmail: "nightops@acmefoods.com", recipientEmail: "ops@harborfreight.demo", body: "Hi — for load HFB-3425 picking up tomorrow, do you have a tracking link we can share with our distribution team? They like to monitor the truck live. Also please confirm carrier name and driver cell number. Thanks.", hoursAgo: 1.5 },
+      ],
+    },
   ];
 
   for (const t of threads) {
@@ -299,6 +429,38 @@ async function main() {
           suggestedAction: category === "status_request" ? "Send latest shipment status." : category === "pod_request" ? "Share POD document if available." : category === "escalation" ? "Escalate to operations lead immediately." : "Review and respond.",
           reasoning: `Keyword match on ${category}.`,
         });
+
+        // Auto-generate drafts for safe categories
+        const DRAFT_TEMPLATES: Record<string, string> = {
+          status_request: load
+            ? `Hi ${t.customerName?.split(" ")[0] ?? "there"},\n\nThank you for reaching out. Load #${t.loadNumber} is currently ${load.currentStatus?.toLowerCase()} and on track for delivery ${load.deliveryAt ? `on ${load.deliveryAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "as scheduled"}. ${load.eta ? `Current ETA is ${load.eta.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}.` : ""}\n\nPlease let me know if you need anything else.\n\nClyde\nFreight Ops AI`
+            : `Hi ${t.customerName?.split(" ")[0] ?? "there"},\n\nThank you for reaching out. Our team is confirming the latest status with the carrier and will update you shortly.\n\nClyde\nFreight Ops AI`,
+          pod_request: `Hi ${t.customerName?.split(" ")[0] ?? "there"},\n\nThank you for your message regarding load #${t.loadNumber}. Our team is retrieving the signed POD from the carrier and will send it over as soon as it is available, typically within 1–2 business hours.\n\nApologies for any delay in billing.\n\nClyde\nFreight Ops AI`,
+          bol_request: `Hi ${t.customerName?.split(" ")[0] ?? "there"},\n\nHappy to help. Please find the BOL for load #${t.loadNumber} attached. Let me know if you need anything else.\n\nClyde\nFreight Ops AI`,
+          appointment_change: `Hi ${t.customerName?.split(" ")[0] ?? "there"},\n\nThank you for the heads up on the appointment change for load #${t.loadNumber}. I'm coordinating with the carrier now to confirm availability for the new window and will update you shortly.\n\nClyde\nFreight Ops AI`,
+          quote_request: `Hi ${t.customerName?.split(" ")[0] ?? "there"},\n\nThank you for reaching out. To provide an accurate quote, could you confirm the following?\n\n- Commodity and weight\n- Pickup date and time window\n- Any special requirements (temp, liftgate, etc.)\n\nWe'll get back to you with pricing as soon as we have those details.\n\nClyde\nFreight Ops AI`,
+          carrier_update: `Hi ${t.carrierName ? t.carrierName.split(" ")[0] : "there"},\n\nThank you for the update on load #${t.loadNumber}. Logged. Please send another check call when you are 2 hours out from the delivery.\n\nClyde\nFreight Ops AI`,
+        };
+
+        const draftBody = DRAFT_TEMPLATES[category];
+        if (draftBody) {
+          const requireApproval = ["escalation", "detention_accessorial", "quote_request", "billing_invoice"].includes(category);
+          const status = requireApproval ? "pending" : "approved";
+          await db.insert(schema.aiDrafts).values({
+            tenantId: tenant.id,
+            messageId: message.id,
+            loadId: load?.id ?? null,
+            draftSubject: `Re: ${t.subject}`,
+            draftBody,
+            confidence: "0.85",
+            approvalRequired: requireApproval,
+            status,
+          });
+          // Update thread status to reflect draft state
+          await db.update(schema.emailThreads)
+            .set({ status: status === "approved" ? "pending_review" : "pending_review" })
+            .where(schema.emailThreads.id ? undefined : undefined); // will update below
+        }
       }
 
       // Audit log
