@@ -5,10 +5,10 @@ const isPublicRoute = createRouteMatcher([
   "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
-  "/api/auth/gmail(.*)",
+  "/api/auth(.*)",  // Gmail OAuth initiation + callback
   "/api/webhooks(.*)",
-  "/api/v1/(.*)",   // TMS API — uses Bearer API key auth, not Clerk
-  "/api/cron/(.*)", // Cron endpoints — uses CRON_SECRET
+  "/api/v1(.*)",    // TMS API — uses Bearer API key auth, not Clerk
+  "/api/cron(.*)",  // Cron endpoints — uses CRON_SECRET
 ]);
 
 // Only enforce Clerk auth when keys are configured
