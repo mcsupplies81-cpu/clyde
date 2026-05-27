@@ -344,6 +344,34 @@ export const apiKeys = pgTable(
   (t) => [index("api_keys_tenant_id_idx").on(t.tenantId)],
 );
 
+// ─── Risk Rules ──────────────────────────────────────────────────────────────
+// Tenant-configurable rules that auto-assign risk level to loads.
+// Rules are evaluated in priority order; first match wins.
+export const riskRuleTypeEnum = pgEnum("risk_rule_type", ["customer", "rate_threshold", "equipment", "lane"]);
+export const riskLevelEnum    = pgEnum("risk_level_enum", ["low", "medium", "high", "critical"]);
+
+export const riskRules = pgTable(
+  "risk_rules",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    ruleType: riskRuleTypeEnum("rule_type").notNull(),
+    // Flexible match values — interpretation depends on ruleType:
+    // customer: matchValue = customer name substring
+    // rate_threshold: matchValue = minimum rate (e.g. "3000"), operator = "gte" | "lte"
+    // equipment: matchValue = equipment type substring (e.g. "Reefer")
+    // lane: matchValue = origin or destination state abbreviation (e.g. "TX")
+    matchValue: text("match_value").notNull(),
+    operator: text("operator").default("contains"), // "contains" | "gte" | "lte" | "eq"
+    riskLevel: text("risk_level").notNull().default("high"), // low | medium | high | critical
+    label: text("label").notNull(), // human-readable label, e.g. "Acme Foods — always hot"
+    isActive: boolean("is_active").notNull().default(true),
+    priority: integer("priority").notNull().default(0), // lower = higher priority
+    createdAt,
+  },
+  (t) => [index("risk_rules_tenant_id_idx").on(t.tenantId)],
+);
+
 // ─── Chase Follow-ups ────────────────────────────────────────────────────────
 export const chaseFollowUpStatusEnum = pgEnum("chase_follow_up_status", ["active", "completed", "cancelled"]);
 

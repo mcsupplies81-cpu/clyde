@@ -12,8 +12,8 @@ import { InboxRoot } from "./InboxRoot";
 // ─── Filter types ─────────────────────────────────────────────────────────────
 
 type InboxFilter =
-  | "all" | "needs_review" | "ready_to_send" | "sent" | "escalated" | "resolved"
-  | "pod_request" | "bol_request" | "quote_request" | "status_request" | "appointment_change";
+  | "all" | "needs_review" | "ready_to_send" | "sent" | "escalated" | "resolved" | "urgent"
+  | "pod_request" | "bol_request" | "quote_request" | "status_request" | "appointment_change" | "carrier_concern";
 
 // ─── Thread list query (filter-specific) ──────────────────────────────────────
 
@@ -47,6 +47,7 @@ async function getThreadsForFilter(tenantId: string, filter: InboxFilter | undef
   if (filter === "sent")      return db.query.emailThreads.findMany({ where: and(base.tenantId, eq(emailThreads.status, "sent")),      orderBy: [desc(emailThreads.lastMessageAt)] });
   if (filter === "escalated") return db.query.emailThreads.findMany({ where: and(base.tenantId, eq(emailThreads.status, "escalated")), orderBy: [desc(emailThreads.lastMessageAt)] });
   if (filter === "resolved")  return db.query.emailThreads.findMany({ where: and(base.tenantId, eq(emailThreads.status, "resolved")),  orderBy: [desc(emailThreads.lastMessageAt)] });
+  if (filter === "urgent")    return db.query.emailThreads.findMany({ where: and(base.tenantId, eq(emailThreads.priority, "urgent")),  orderBy: [desc(emailThreads.lastMessageAt)] });
 
   // Category-based filters — find threads whose latest classification matches a category
   const CATEGORY_FILTERS: Partial<Record<InboxFilter, string>> = {
@@ -55,6 +56,7 @@ async function getThreadsForFilter(tenantId: string, filter: InboxFilter | undef
     quote_request: "quote_request",
     status_request: "status_request",
     appointment_change: "appointment_change",
+    carrier_concern: "carrier_concern",
   };
   if (filter && CATEGORY_FILTERS[filter]) {
     const category = CATEGORY_FILTERS[filter];

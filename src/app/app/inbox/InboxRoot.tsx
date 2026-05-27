@@ -64,6 +64,7 @@ type InboxRootProps = {
 // Primary filters shown as large tabs (Superhuman-style)
 const PRIMARY_TABS = [
   { label: "All",           value: undefined },
+  { label: "Urgent",        value: "urgent" },
   { label: "Needs Review",  value: "needs_review" },
   { label: "Ready to Send", value: "ready_to_send" },
   { label: "Done",          value: "resolved" },
@@ -73,6 +74,7 @@ const PRIMARY_TABS = [
 const SECONDARY_TABS = [
   { label: "Sent",           value: "sent" },
   { label: "Escalated",      value: "escalated" },
+  { label: "Carrier Issues", value: "carrier_concern" },
   { label: "Quotes",         value: "quote_request" },
   { label: "Status Updates", value: "status_request" },
   { label: "Needs POD",      value: "pod_request" },
