@@ -359,7 +359,7 @@ export function InboxRoot({
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
 
       {/* ── Left: thread list ───────────────────────────────────────────── */}
-      <div className="inbox-threads" style={{ width: 300, minWidth: 300, borderRight: "1px solid #EBEBEB", display: "flex", flexDirection: "column", overflow: "hidden", background: "#FFFFFF" }}>
+      <div className="inbox-threads" style={{ width: 300, minWidth: 300, borderRight: "1px solid #EBEBEB", display: "flex", flexDirection: "column", background: "#FFFFFF", overflowX: "visible" }}>
 
         {/* Thread list header */}
         <div style={{ padding: "8px 10px 8px 14px", borderBottom: "1px solid #F0F0F0", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
@@ -403,10 +403,10 @@ export function InboxRoot({
 
             {filterPanelOpen && (
               <div style={{
-                position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50,
+                position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 200,
                 background: "#FFFFFF", border: "1px solid #E8E8E8",
-                borderRadius: 10, boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
-                padding: 14, minWidth: 220,
+                borderRadius: 10, boxShadow: "0 4px 24px rgba(0,0,0,0.14)",
+                padding: 14, minWidth: 230,
               }}>
                 {/* Customer / company */}
                 <div style={{ marginBottom: 14 }}>
