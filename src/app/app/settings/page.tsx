@@ -68,7 +68,9 @@ async function revokeApiKeyAction(_prev: unknown, formData: FormData) {
   return { ok: true };
 }
 
-export default async function SettingsPage() {
+export default async function SettingsPage(props: { searchParams?: Promise<Record<string, string>> }) {
+  const searchParams = await (props.searchParams ?? Promise.resolve({}));
+  const gmailStatus = searchParams.gmail ?? null;
   const tenantId = (await getTenantIdForUser()) ?? "";
   const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY);
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://clyde-app.vercel.app";
@@ -221,6 +223,21 @@ export default async function SettingsPage() {
             Connect your Gmail account to send replies directly from your inbox. Clyde will send as you — no copy-paste required.
           </p>
 
+          {gmailStatus === "connected" && (
+            <div style={{ marginBottom: 12, background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 6, padding: "8px 12px", fontSize: 12, color: "#15803D", fontWeight: 600 }}>
+              ✓ Gmail connected successfully
+            </div>
+          )}
+          {(gmailStatus === "auth_failed" || gmailStatus === "invalid_grant") && (
+            <div style={{ marginBottom: 12, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, padding: "8px 12px", fontSize: 12, color: "#DC2626" }}>
+              Connection failed — try clicking Connect Gmail again. If it keeps failing, go to your Google Account → Security → Third-party apps and remove Clyde, then reconnect.
+            </div>
+          )}
+          {gmailStatus === "reauth_required" && (
+            <div style={{ marginBottom: 12, background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: 6, padding: "8px 12px", fontSize: 12, color: "#C2410C" }}>
+              Google didn&apos;t return a refresh token — please click Connect Gmail again to re-authorize.
+            </div>
+          )}
           {gmailConnection ? (
             <div style={{ display: "flex", flexDirection: "column" as const, gap: 12 }}>
               <div style={rowStyle}>
