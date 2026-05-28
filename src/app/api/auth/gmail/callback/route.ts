@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, asc, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { inboxConnections, inboxes } from "@/db/schema";
 import { encryptToken, getOAuthClient } from "@/lib/gmail";
@@ -12,8 +12,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/app/settings?gmail=error", request.url));
   }
 
+  // Find any inbox for this tenant — provider doesn't have to be 'gmail',
+  // we store the OAuth tokens in inbox_connections separately.
   const inbox = await db.query.inboxes.findFirst({
-    where: and(eq(inboxes.tenantId, tenantId), eq(inboxes.provider, "gmail")),
+    where: eq(inboxes.tenantId, tenantId),
     orderBy: [asc(inboxes.createdAt)],
   });
 
