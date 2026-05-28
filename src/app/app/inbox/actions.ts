@@ -12,6 +12,7 @@ import { mockClassify, openAiClassify } from "@/lib/ai-classifier";
 import { canAutoSend, requiresHumanApproval, SAFE_TO_AUTO_DRAFT, NEVER_AUTO_SEND } from "@/lib/safety";
 import { getTenantIdForUser } from "@/lib/auth";
 import { sendReply } from "@/lib/email-sender";
+import { sendViaGmail, hasGmailConnection } from "@/lib/gmail";
 
 async function getTenantId(): Promise<string> {
   const id = await getTenantIdForUser();
@@ -467,15 +468,27 @@ export async function sendManualReplyAction(
     orderBy: [emailMessages.receivedAt],
   });
 
-  // Attempt to send via Postmark (dry-run if no token)
-  const sendResult = await sendReply({
-    to,
-    from: fromEmail,
-    fromName: "Clyde | Freight Ops",
-    subject,
-    body,
-    inReplyToMessageId: firstInbound?.gmailMessageId,
-  });
+  // Use Gmail if connected, otherwise fall back to Postmark
+  const gmailConnected = await hasGmailConnection(tenantId);
+  const sendResult = gmailConnected
+    ? await sendViaGmail(tenantId, {
+        to,
+        from: fromEmail,
+        fromName: "Clyde | Freight Ops",
+        subject,
+        body,
+        inReplyToMessageId: firstInbound?.gmailMessageId,
+      })
+    : await sendReply({
+        to,
+        from: fromEmail,
+        fromName: "Clyde | Freight Ops",
+        subject,
+        body,
+        inReplyToMessageId: firstInbound?.gmailMessageId,
+      });
+
+  console.log(`[sendManualReply] Sent via ${sendResult.mode}`, sendResult.sent ? "✓" : "✗ " + sendResult.error);
   if (!sendResult.sent) {
     console.warn("[sendManualReply] Send failed:", sendResult.error);
   }

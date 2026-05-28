@@ -8,6 +8,8 @@ const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/gmail.modify",
+  // email scope lets getTokenInfo() return the user's email address
+  "https://www.googleapis.com/auth/userinfo.email",
 ];
 
 function getTokenSecret() {
@@ -94,4 +96,76 @@ export async function getGmailClient(tenantId: string) {
   });
 
   return google.gmail({ version: "v1", auth: oauth2Client });
+}
+
+// ─── Send an email via the Gmail API ─────────────────────────────────────────
+
+interface GmailSendParams {
+  to: string;
+  from: string;        // sender address (shown in From:)
+  fromName?: string;
+  subject: string;
+  body: string;
+  inReplyToMessageId?: string | null;
+}
+
+interface GmailSendResult {
+  sent: boolean;
+  messageId?: string;
+  error?: string;
+  mode: "gmail";
+}
+
+function buildMimeMessage(params: GmailSendParams): string {
+  const from = params.fromName
+    ? `${params.fromName} <${params.from}>`
+    : params.from;
+
+  const lines = [
+    `From: ${from}`,
+    `To: ${params.to}`,
+    `Subject: ${params.subject}`,
+    `Content-Type: text/plain; charset=utf-8`,
+    `MIME-Version: 1.0`,
+  ];
+
+  if (params.inReplyToMessageId) {
+    lines.push(`In-Reply-To: ${params.inReplyToMessageId}`);
+    lines.push(`References: ${params.inReplyToMessageId}`);
+  }
+
+  lines.push("", params.body);
+
+  // Gmail API requires base64url encoding (no padding issues)
+  return Buffer.from(lines.join("\r\n")).toString("base64url");
+}
+
+export async function sendViaGmail(
+  tenantId: string,
+  params: GmailSendParams,
+): Promise<GmailSendResult> {
+  try {
+    const gmail = await getGmailClient(tenantId);
+    const raw = buildMimeMessage(params);
+
+    const res = await gmail.users.messages.send({
+      userId: "me",
+      requestBody: { raw },
+    });
+
+    return { sent: true, messageId: res.data.id ?? undefined, mode: "gmail" };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Gmail send error";
+    console.error("[gmail] sendViaGmail error:", msg);
+    return { sent: false, error: msg, mode: "gmail" };
+  }
+}
+
+/** Check if tenant has a live Gmail connection */
+export async function hasGmailConnection(tenantId: string): Promise<boolean> {
+  const row = await db.query.inboxConnections.findFirst({
+    where: and(eq(inboxConnections.tenantId, tenantId), eq(inboxConnections.provider, "gmail")),
+    columns: { id: true },
+  });
+  return Boolean(row);
 }
