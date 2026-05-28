@@ -28,6 +28,7 @@ export const tenants = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
+    timezone: text("timezone").notNull().default("America/Chicago"),
     createdAt,
   },
   (t) => [index("tenants_created_at_idx").on(t.createdAt)],

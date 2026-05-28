@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.4.1",
+    "@sentry/nextjs": "^10.55.0",
     "@vercel/blob": "^2.4.0",
     "drizzle-orm": "^0.43.1",
     "googleapis": "^150.0.1",

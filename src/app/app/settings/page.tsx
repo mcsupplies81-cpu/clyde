@@ -28,6 +28,16 @@ async function updateTenantName(formData: FormData) {
   revalidatePath("/app/settings");
 }
 
+async function updateTimezone(formData: FormData) {
+  "use server";
+  const tenantId = (await getTenantIdForUser()) ?? "";
+  const timezone = String(formData.get("timezone") ?? "").trim();
+  const valid = ["UTC","America/New_York","America/Chicago","America/Denver","America/Los_Angeles","Europe/London"];
+  if (!tenantId || !valid.includes(timezone)) return;
+  await db.update(tenants).set({ timezone }).where(eq(tenants.id, tenantId));
+  revalidatePath("/app/settings");
+}
+
 async function updateInboxEmail(formData: FormData) {
   "use server";
   const tenantId = (await getTenantIdForUser()) ?? "";
@@ -106,15 +116,18 @@ export default async function SettingsPage(props: { searchParams?: Promise<Recor
             </div>
           </form>
 
-          <div style={rowStyle}>
+          <form action={updateTimezone} style={rowStyle}>
             <div>
               <div style={labelStyle}>Timezone</div>
               <div style={subtleStyle}>Timestamps displayed in this timezone</div>
             </div>
-            <select style={inputStyle} defaultValue="America/Chicago">
-              {timezones.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
-            </select>
-          </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <select name="timezone" style={inputStyle} defaultValue={tenant?.timezone ?? "America/Chicago"}>
+                {timezones.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+              </select>
+              <button type="submit" style={buttonStyle}>Save</button>
+            </div>
+          </form>
         </section>
 
         <section style={sectionStyle}>

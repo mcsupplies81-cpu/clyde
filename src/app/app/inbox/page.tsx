@@ -3,11 +3,12 @@ import { unstable_cache } from "next/cache";
 import { db } from "@/db";
 import {
   emailThreads, emailMessages, loads,
-  aiClassifications, aiDrafts,
+  aiClassifications, aiDrafts, inboxConnections, inboxes,
 } from "@/db/schema";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { fetchThreadDetail } from "@/lib/inbox-thread-detail";
 import { InboxRoot } from "./InboxRoot";
+import { InboxEmptyState } from "./InboxEmptyState";
 
 // ─── Filter types ─────────────────────────────────────────────────────────────
 
@@ -71,7 +72,7 @@ async function getThreadsForFilter(tenantId: string, filter: InboxFilter | undef
       : [];
   }
 
-  return db.query.emailThreads.findMany({ where: base.tenantId, orderBy: [desc(emailThreads.lastMessageAt)], limit: 60 });
+  return db.query.emailThreads.findMany({ where: base.tenantId, orderBy: [desc(emailThreads.lastMessageAt)], limit: 200 });
 }
 
 // ─── Cached thread list (60-second TTL) ───────────────────────────────────────
@@ -152,9 +153,30 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   ];
   const filter = validFilters.includes(rawFilter as InboxFilter) ? (rawFilter as InboxFilter) : undefined;
 
-  const listData = await getCachedThreadListData(tenantId, filter ?? "all");
+  // Check setup state in parallel with thread list
+  const [listData, inbox, gmailConnection, loadCount] = await Promise.all([
+    getCachedThreadListData(tenantId, filter ?? "all"),
+    db.query.inboxes.findFirst({ where: eq(inboxes.tenantId, tenantId) }),
+    db.query.inboxConnections.findFirst({
+      where: and(eq(inboxConnections.tenantId, tenantId), eq(inboxConnections.provider, "gmail")),
+    }),
+    db.$count(loads, eq(loads.tenantId, tenantId)),
+  ]);
 
   const { threads, firstMsgByThread, clsByMsg, latestDraftByMsg, loadByNumber } = listData;
+
+  // Show onboarding empty state if the workspace is genuinely empty
+  // (no threads AND no loads — this is a brand-new account)
+  if (threads.length === 0 && loadCount === 0 && !filter) {
+    return (
+      <InboxEmptyState
+        hasInbox={!!inbox}
+        hasGmail={!!gmailConnection}
+        inboxEmail={inbox?.emailAddress ?? null}
+      />
+    );
+  }
+
   const initialSelectedId = threadId ?? threads[0]?.id ?? null;
 
   // Fetch initial thread detail for SSR (so first paint has content)
