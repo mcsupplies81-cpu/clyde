@@ -69,7 +69,7 @@ async function revokeApiKeyAction(_prev: unknown, formData: FormData) {
 }
 
 export default async function SettingsPage(props: { searchParams?: Promise<Record<string, string>> }) {
-  const searchParams = await (props.searchParams ?? Promise.resolve({}));
+  const searchParams = await (props.searchParams ?? Promise.resolve({} as Record<string, string>));
   const gmailStatus = searchParams.gmail ?? null;
   const tenantId = (await getTenantIdForUser()) ?? "";
   const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY);
@@ -300,6 +300,50 @@ export default async function SettingsPage(props: { searchParams?: Promise<Recor
               )}
             </div>
           )}
+        </section>
+
+        {/* Outlook OAuth */}
+        <section style={sectionStyle}>
+          <h2 style={sectionTitleStyle}>Outlook / Microsoft 365 Connection</h2>
+          <p style={{ margin: "0 0 14px", fontSize: 12, color: "#7F7F7F", lineHeight: 1.6 }}>
+            Connect your Outlook or Microsoft 365 account. Most carriers and brokers use Outlook — this lets Clyde send replies directly from your inbox.
+          </p>
+          <div style={rowStyle}>
+            <div>
+              <div style={labelStyle}>Microsoft account</div>
+              <div style={subtleStyle}>Not connected</div>
+            </div>
+            <a
+              href="/api/auth/outlook"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 7,
+                padding: "8px 16px",
+                background: "#FFFFFF",
+                border: "1px solid #E8E8E8",
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#374151",
+                textDecoration: "none",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                opacity: 0.5,
+                cursor: "not-allowed",
+                pointerEvents: "none",
+              }}
+            >
+              {/* Microsoft logo */}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <rect x="1" y="1" width="10" height="10" fill="#F25022"/>
+                <rect x="13" y="1" width="10" height="10" fill="#7FBA00"/>
+                <rect x="1" y="13" width="10" height="10" fill="#00A4EF"/>
+                <rect x="13" y="13" width="10" height="10" fill="#FFB900"/>
+              </svg>
+              Connect Outlook
+            </a>
+          </div>
+          <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>
+            Coming soon — Microsoft Azure OAuth setup in progress.
+          </div>
         </section>
 
         {/* TMS / CRM Integration API */}
