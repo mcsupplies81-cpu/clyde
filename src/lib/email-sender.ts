@@ -22,6 +22,9 @@ interface SendResult {
 
 export async function sendReply(params: SendReplyParams): Promise<SendResult> {
   const token = process.env.POSTMARK_API_TOKEN;
+  // Allow overriding the FROM address via env (needed when inbox.emailAddress is
+  // the Postmark inbound address, not a verified sender signature)
+  const fromEmail = process.env.POSTMARK_FROM_EMAIL ?? params.from;
 
   if (!token) {
     // No token — log and return dry-run success so the app still works
@@ -41,7 +44,7 @@ export async function sendReply(params: SendReplyParams): Promise<SendResult> {
   }
 
   const payload = {
-    From: params.fromName ? `${params.fromName} <${params.from}>` : params.from,
+    From: params.fromName ? `${params.fromName} <${fromEmail}>` : fromEmail,
     To: params.to,
     Subject: params.subject,
     TextBody: params.body,
