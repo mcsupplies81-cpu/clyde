@@ -169,7 +169,7 @@ export default async function LoadDetailPage({ params }: { params: Promise<{ id:
     await db.update(loads).set({ currentStatus: newStatus }).where(and(eq(loads.id, id), eq(loads.tenantId, tenantId)));
     const { auditLogs: auditLogsTable } = await import("@/db/schema");
     await db.insert(auditLogsTable).values({
-      tenantId, actorType: "user", actorName: "Marcus Webb",
+      tenantId, actorType: "user", actorName: "Ops Team",
       entityType: "load", entityId: id,
       action: "status_updated", metadata: { newStatus },
     });

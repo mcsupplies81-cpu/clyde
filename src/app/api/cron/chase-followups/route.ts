@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { chaseFollowUps, loads, inboxes, auditLogs } from "@/db/schema";
-import { sendReply } from "@/lib/email-sender";
+import { sendEmail } from "@/lib/send-email";
 
 export async function GET(request: NextRequest) {
   const token = request.headers.get("authorization")?.replace("Bearer ", "");
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       const followUpNote = `\n\n---\nThis is follow-up #${fu.sendCount + 1} of ${fu.maxSends}. If you have already sent these documents, please disregard this message.`;
       const body = fu.messageTemplate + followUpNote;
 
-      const result = await sendReply({ to: fu.carrierEmail, from: fromEmail, fromName, subject, body });
+      const result = await sendEmail(fu.tenantId, { to: fu.carrierEmail, from: fromEmail, fromName, subject, body });
 
       const newSendCount = fu.sendCount + 1;
       const completed    = newSendCount >= fu.maxSends;

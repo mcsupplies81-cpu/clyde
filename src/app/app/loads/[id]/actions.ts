@@ -5,7 +5,7 @@ import { and, eq, desc, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { loads, inboxes, emailMessages, emailThreads, auditLogs, chaseFollowUps } from "@/db/schema";
 import { getTenantIdForUser } from "@/lib/auth";
-import { sendReply } from "@/lib/email-sender";
+import { sendEmail } from "@/lib/send-email";
 
 export type ChaseResult = { ok: true; mode: string; followUpId?: string } | { ok: false; error: string };
 
@@ -23,7 +23,7 @@ async function doChaseEmail(params: {
   const subject = isMulti
     ? `Missing Documents: Load #${params.loadNumber}`
     : `${params.docTypes} Request: Load #${params.loadNumber}`;
-  return sendReply({ to: params.carrierEmail, from: params.fromEmail, fromName: params.fromName, subject, body: params.message });
+  return sendEmail(params.tenantId, { to: params.carrierEmail, from: params.fromEmail, fromName: params.fromName, subject, body: params.message });
 }
 
 export async function chaseDocumentAction(_prev: ChaseResult | null, formData: FormData): Promise<ChaseResult> {

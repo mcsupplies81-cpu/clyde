@@ -11,8 +11,7 @@ import { revalidatePath } from "next/cache";
 import { mockClassify, openAiClassify } from "@/lib/ai-classifier";
 import { canAutoSend, requiresHumanApproval, SAFE_TO_AUTO_DRAFT, NEVER_AUTO_SEND } from "@/lib/safety";
 import { getTenantIdForUser } from "@/lib/auth";
-import { sendReply } from "@/lib/email-sender";
-import { sendViaGmail, hasGmailConnection } from "@/lib/gmail";
+import { sendEmail, getActorName } from "@/lib/send-email";
 
 async function getTenantId(): Promise<string> {
   const id = await getTenantIdForUser();
@@ -219,13 +218,14 @@ export async function generateDraftAction(formData: FormData) {
 
 export async function approveDraftAction(formData: FormData) {
   const tenantId = await getTenantId();
+  const actorName = await getActorName(tenantId);
   const draftId  = String(formData.get("draftId") ?? "");
   const threadId = formData.get("threadId") ? String(formData.get("threadId")) : undefined;
   if (!draftId) return;
 
-  await db.update(aiDrafts).set({ status: "approved", approvedBy: "Marcus Webb", approvedAt: new Date(), updatedAt: new Date() }).where(eq(aiDrafts.id, draftId));
+  await db.update(aiDrafts).set({ status: "approved", approvedBy: actorName, approvedAt: new Date(), updatedAt: new Date() }).where(eq(aiDrafts.id, draftId));
   await db.insert(auditLogs).values({
-    tenantId, actorType: "user", actorName: "Marcus Webb",
+    tenantId, actorType: "user", actorName,
     entityType: "ai_draft", entityId: draftId,
     action: "draft_approved", metadata: { draftId, threadId },
   });
@@ -234,7 +234,7 @@ export async function approveDraftAction(formData: FormData) {
       and(eq(emailThreads.id, threadId), eq(emailThreads.tenantId, tenantId)),
     );
     await db.insert(auditLogs).values({
-      tenantId, actorType: "user", actorName: "Marcus Webb",
+      tenantId, actorType: "user", actorName,
       entityType: "email_thread", entityId: threadId,
       action: "draft_approved", metadata: {},
     });
@@ -244,12 +244,13 @@ export async function approveDraftAction(formData: FormData) {
 
 export async function rejectDraftAction(formData: FormData) {
   const tenantId = await getTenantId();
+  const actorName = await getActorName(tenantId);
   const draftId  = String(formData.get("draftId") ?? "");
   if (!draftId) return;
 
   await db.update(aiDrafts).set({ status: "rejected", updatedAt: new Date() }).where(eq(aiDrafts.id, draftId));
   await db.insert(auditLogs).values({
-    tenantId, actorType: "user", actorName: "Marcus Webb",
+    tenantId, actorType: "user", actorName,
     entityType: "ai_draft", entityId: draftId,
     action: "draft_rejected", metadata: { draftId },
   });
@@ -258,13 +259,14 @@ export async function rejectDraftAction(formData: FormData) {
 
 export async function editDraftAction(formData: FormData) {
   const tenantId = await getTenantId();
+  const actorName = await getActorName(tenantId);
   const draftId  = String(formData.get("draftId") ?? "");
   const newBody  = String(formData.get("draftBody") ?? "");
   if (!draftId) return;
 
   await db.update(aiDrafts).set({ status: "edited", draftBody: newBody, updatedAt: new Date() }).where(eq(aiDrafts.id, draftId));
   await db.insert(auditLogs).values({
-    tenantId, actorType: "user", actorName: "Marcus Webb",
+    tenantId, actorType: "user", actorName,
     entityType: "ai_draft", entityId: draftId,
     action: "draft_edited", metadata: { draftId },
   });
@@ -273,6 +275,7 @@ export async function editDraftAction(formData: FormData) {
 
 export async function markSentManuallyAction(formData: FormData) {
   const tenantId = await getTenantId();
+  const actorName = await getActorName(tenantId);
   const tid = String(formData.get("threadId") ?? "");
   if (!tid) return;
 
@@ -284,7 +287,7 @@ export async function markSentManuallyAction(formData: FormData) {
     .where(and(eq(emailMessages.threadId, tid), inArray(aiDrafts.status, ["approved", "edited"])));
   if (approvedDrafts.length) {
     await db.update(aiDrafts)
-      .set({ status: "sent", sentAt: new Date(), sentBy: "Marcus Webb (manual)", updatedAt: new Date() })
+      .set({ status: "sent", sentAt: new Date(), sentBy: `${actorName} (manual)`, updatedAt: new Date() })
       .where(inArray(aiDrafts.id, approvedDrafts.map((d) => d.id)));
   }
 
@@ -292,7 +295,7 @@ export async function markSentManuallyAction(formData: FormData) {
     and(eq(emailThreads.id, tid), eq(emailThreads.tenantId, tenantId)),
   );
   await db.insert(auditLogs).values({
-    tenantId, actorType: "user", actorName: "Marcus Webb",
+    tenantId, actorType: "user", actorName,
     entityType: "email_thread", entityId: tid,
     action: "marked_sent_manually", metadata: {},
   });
@@ -329,9 +332,9 @@ export async function demoSendDraftAction(_prevState: unknown, formData: FormDat
   const subject = draft.draftSubject ?? `Re: ${thread.subject}`;
   const now = new Date();
 
-  // Actually send via Postmark (or dry-run if no token)
+  // Send via Gmail if connected, Postmark otherwise
   if (toEmail) {
-    const result = await sendReply({
+    const result = await sendEmail(tenantId, {
       to: toEmail,
       from: fromEmail,
       fromName: "Clyde | Freight Ops",
@@ -378,13 +381,14 @@ export async function demoSendDraftAction(_prevState: unknown, formData: FormDat
 
 export async function resolveThreadAction(formData: FormData) {
   const tenantId = await getTenantId();
+  const actorName = await getActorName(tenantId);
   const tid = String(formData.get("threadId") ?? "");
   if (!tid) return;
   await db.update(emailThreads).set({ status: "resolved" }).where(
     and(eq(emailThreads.id, tid), eq(emailThreads.tenantId, tenantId)),
   );
   await db.insert(auditLogs).values({
-    tenantId, actorType: "user", actorName: "Marcus Webb",
+    tenantId, actorType: "user", actorName,
     entityType: "email_thread", entityId: tid,
     action: "thread_resolved", metadata: {},
   });
@@ -399,6 +403,7 @@ export async function saveAttachmentToLoadAction(
   formData: FormData,
 ): Promise<{ success?: boolean; error?: string }> {
   const tenantId    = await getTenantId();
+  const actorName   = await getActorName(tenantId);
   const attachmentId = String(formData.get("attachmentId") ?? "");
   const loadId       = String(formData.get("loadId") ?? "");
   if (!attachmentId || !loadId) return { error: "Missing params" };
@@ -429,7 +434,7 @@ export async function saveAttachmentToLoadAction(
   });
 
   await db.insert(auditLogs).values({
-    tenantId, actorType: "user", actorName: "Marcus Webb",
+    tenantId, actorType: "user", actorName,
     entityType: "load", entityId: loadId,
     action: "document_saved_from_email",
     metadata: { attachmentId, documentType: att.documentType, fileName: att.fileName, loadId },
@@ -468,25 +473,17 @@ export async function sendManualReplyAction(
     orderBy: [emailMessages.receivedAt],
   });
 
-  // Use Gmail if connected, otherwise fall back to Postmark
-  const gmailConnected = await hasGmailConnection(tenantId);
-  const sendResult = gmailConnected
-    ? await sendViaGmail(tenantId, {
-        to,
-        from: fromEmail,
-        fromName: "Clyde | Freight Ops",
-        subject,
-        body,
-        inReplyToMessageId: firstInbound?.gmailMessageId,
-      })
-    : await sendReply({
-        to,
-        from: fromEmail,
-        fromName: "Clyde | Freight Ops",
-        subject,
-        body,
-        inReplyToMessageId: firstInbound?.gmailMessageId,
-      });
+  const actorName = await getActorName(tenantId);
+
+  // Use Gmail if connected, Postmark otherwise
+  const sendResult = await sendEmail(tenantId, {
+    to,
+    from: fromEmail,
+    fromName: "Clyde | Freight Ops",
+    subject,
+    body,
+    inReplyToMessageId: firstInbound?.gmailMessageId,
+  });
 
   console.log(`[sendManualReply] Sent via ${sendResult.mode}`, sendResult.sent ? "✓" : "✗ " + sendResult.error);
   if (!sendResult.sent) {
@@ -499,7 +496,7 @@ export async function sendManualReplyAction(
     tenantId,
     threadId,
     direction: "outbound",
-    senderName: "Marcus Webb",
+    senderName: actorName,
     senderEmail: fromEmail,
     recipientEmail: to,
     subject,
@@ -512,10 +509,10 @@ export async function sendManualReplyAction(
     .where(and(eq(emailThreads.id, threadId), eq(emailThreads.tenantId, tenantId)));
 
   await db.insert(auditLogs).values({
-    tenantId, actorType: "user", actorName: "Marcus Webb",
+    tenantId, actorType: "user", actorName,
     entityType: "email_thread", entityId: threadId,
     action: "manual_reply_sent",
-    metadata: { to, subject, via: sendResult.sent ? "postmark" : "dry-run" },
+    metadata: { to, subject, via: sendResult.mode },
   });
 
   revalidatePath("/app/inbox");
@@ -524,13 +521,14 @@ export async function sendManualReplyAction(
 
 export async function escalateThreadAction(formData: FormData) {
   const tenantId = await getTenantId();
+  const actorName = await getActorName(tenantId);
   const tid = String(formData.get("threadId") ?? "");
   if (!tid) return;
   await db.update(emailThreads).set({ status: "escalated", priority: "urgent" }).where(
     and(eq(emailThreads.id, tid), eq(emailThreads.tenantId, tenantId)),
   );
   await db.insert(auditLogs).values({
-    tenantId, actorType: "user", actorName: "Marcus Webb",
+    tenantId, actorType: "user", actorName,
     entityType: "email_thread", entityId: tid,
     action: "thread_escalated", metadata: {},
   });
@@ -927,10 +925,12 @@ export async function sendDraftViaGmailAction(
     const gmailMessageId = response.data.id;
     if (!gmailMessageId) return { error: "Gmail send failed: missing message ID in response" };
 
+    const actorName = await getActorName(thread.tenantId);
+
     await db.update(aiDrafts).set({
       status: "sent",
       sentAt: new Date(),
-      sentBy: "Marcus Webb",
+      sentBy: actorName,
       gmailSentMessageId: gmailMessageId,
       finalBody: draft.draftBody,
       updatedAt: new Date(),
@@ -942,7 +942,7 @@ export async function sendDraftViaGmailAction(
       tenantId: thread.tenantId,
       threadId: thread.id,
       direction: "outbound",
-      senderName: "Marcus Webb",
+      senderName: actorName,
       senderEmail: inbox.emailAddress,
       recipientEmail: firstInbound.senderEmail,
       subject: draft.draftSubject ?? thread.subject,
@@ -954,7 +954,7 @@ export async function sendDraftViaGmailAction(
     await db.insert(auditLogs).values({
       tenantId: thread.tenantId,
       actorType: "user",
-      actorName: "Marcus Webb",
+      actorName,
       entityType: "ai_draft",
       entityId: draft.id,
       action: "draft_sent_via_gmail",

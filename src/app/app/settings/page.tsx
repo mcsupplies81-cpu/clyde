@@ -11,9 +11,9 @@ import { ApiKeySection } from "./ApiKeySection";
 
 const timezones = ["UTC", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Europe/London"];
 
-async function disconnectGmail(formData: FormData) {
+async function disconnectGmail() {
   "use server";
-  const tenantId = String(formData.get("tenantId") ?? "");
+  const tenantId = (await getTenantIdForUser()) ?? "";
   if (!tenantId) return;
   await db.delete(inboxConnections).where(and(eq(inboxConnections.tenantId, tenantId), eq(inboxConnections.provider, "gmail")));
   revalidatePath("/app/settings");
