@@ -41,6 +41,11 @@ function parseEmail(raw: string) {
 
 export async function POST(req: NextRequest) {
   const secret = process.env.INBOUND_WEBHOOK_SECRET;
+  if (!secret && process.env.NODE_ENV === "production") {
+    // In production, require the webhook secret to prevent anyone from injecting emails.
+    console.error("[inbound-email] INBOUND_WEBHOOK_SECRET is not set — rejecting request for security.");
+    return NextResponse.json({ error: "Webhook secret not configured" }, { status: 503 });
+  }
   if (secret) {
     const token = req.headers.get("x-webhook-secret") ?? req.nextUrl.searchParams.get("secret");
     if (token !== secret) {

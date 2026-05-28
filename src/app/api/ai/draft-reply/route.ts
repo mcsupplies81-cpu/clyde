@@ -93,7 +93,7 @@ export async function POST(request: Request) {
 function mockDraft(category: string, senderName: string, load: { loadNumber?: string | null; currentStatus?: string | null; eta?: Date | null } | null): string {
   const greeting = `Hi ${senderName.split(" ")[0]},`;
   const loadRef = load?.loadNumber ? `load #${load.loadNumber}` : "this shipment";
-  const sign = "\n\nHarbor Freight Ops";
+  const sign = "\n\nFreight Ops Team";
   switch (category) {
     case "status_request":
       return `${greeting}\n\nOur team is actively monitoring ${loadRef}. ${load?.currentStatus ? `Current status: ${load.currentStatus}.` : ""} We will provide an updated ETA as soon as we confirm with the carrier.${sign}`;

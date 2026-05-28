@@ -422,6 +422,12 @@ Authorization: Bearer clyde_live_...
 
         <section style={sectionStyle}>
           <h2 style={sectionTitleStyle}>Debug Info</h2>
+          {process.env.DEMO_TENANT_ID && (
+            <div style={{ background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 12, color: "#C2410C" }}>
+              ⚠️ <strong>DEMO_TENANT_ID is active.</strong> All authenticated users share this tenant's data.
+              Remove this env var in production before onboarding real customers.
+            </div>
+          )}
           <div style={rowStyle}>
             <div style={labelStyle}>Tenant ID</div>
             <code style={codeStyle}>{tenantId || "not set"}</code>
@@ -440,6 +446,12 @@ Authorization: Bearer clyde_live_...
             <div style={labelStyle}>Blob storage</div>
             <div style={{ ...pillStyle, background: process.env.BLOB_READ_WRITE_TOKEN ? "#F0FDF4" : "#F9FAFB", color: process.env.BLOB_READ_WRITE_TOKEN ? "#16A34A" : "#9CA3AF" }}>
               {process.env.BLOB_READ_WRITE_TOKEN ? "Connected" : "Not configured — attachments metadata only"}
+            </div>
+          </div>
+          <div style={rowStyle}>
+            <div style={labelStyle}>Webhook security</div>
+            <div style={{ ...pillStyle, background: process.env.INBOUND_WEBHOOK_SECRET ? "#F0FDF4" : "#FFF7ED", color: process.env.INBOUND_WEBHOOK_SECRET ? "#16A34A" : "#EA580C" }}>
+              {process.env.INBOUND_WEBHOOK_SECRET ? "Secret set" : "No secret — set INBOUND_WEBHOOK_SECRET"}
             </div>
           </div>
         </section>
