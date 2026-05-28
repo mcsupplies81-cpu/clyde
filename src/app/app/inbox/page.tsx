@@ -3,7 +3,7 @@ import { unstable_cache } from "next/cache";
 import { db } from "@/db";
 import {
   emailThreads, emailMessages, loads,
-  aiClassifications, aiDrafts, inboxConnections,
+  aiClassifications, aiDrafts,
 } from "@/db/schema";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { fetchThreadDetail } from "@/lib/inbox-thread-detail";
@@ -152,14 +152,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   ];
   const filter = validFilters.includes(rawFilter as InboxFilter) ? (rawFilter as InboxFilter) : undefined;
 
-  // Fetch thread list (cached) + connection in parallel
-  const [listData, connection] = await Promise.all([
-    getCachedThreadListData(tenantId, filter ?? "all"),
-    db.query.inboxConnections.findFirst({
-      where: and(eq(inboxConnections.tenantId, tenantId), eq(inboxConnections.status, "connected")),
-      orderBy: [desc(inboxConnections.createdAt)],
-    }),
-  ]);
+  const listData = await getCachedThreadListData(tenantId, filter ?? "all");
 
   const { threads, firstMsgByThread, clsByMsg, latestDraftByMsg, loadByNumber } = listData;
   const initialSelectedId = threadId ?? threads[0]?.id ?? null;
@@ -178,7 +171,6 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       loadByNumber={loadByNumber}
       initialSelectedId={initialSelectedId}
       initialDetail={initialDetail}
-      connection={connection ?? null}
       filter={filter}
     />
   );

@@ -15,7 +15,6 @@ import { RightContextPanel } from "./components/RightContextPanel";
 import { LoadContextCard } from "./components/LoadContextCard";
 import { DOC_ICON, DOC_COLOR } from "@/lib/document-classifier";
 import type { DocumentType } from "@/lib/document-classifier";
-import { SyncButton } from "./SyncButton";
 import type { ThreadDetail } from "@/lib/inbox-thread-detail";
 
 // ── Client-side prefetch cache ─────────────────────────────────────────────────
@@ -58,7 +57,6 @@ type InboxRootProps = {
   loadByNumber: Record<string, string>;
   initialSelectedId: string | null;
   initialDetail: ThreadDetail | null;
-  connection: { lastSyncAt: Date | string | null } | null;
   filter: string | undefined;
 };
 
@@ -110,7 +108,6 @@ export function InboxRoot({
   loadByNumber,
   initialSelectedId,
   initialDetail,
-  connection,
   filter,
 }: InboxRootProps) {
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
@@ -351,7 +348,6 @@ export function InboxRoot({
               </Link>
             );
           })}
-          {connection && <SyncButton />}
         </div>
       </div>
 
