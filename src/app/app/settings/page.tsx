@@ -65,6 +65,19 @@ async function createApiKeyAction(_prev: unknown, formData: FormData) {
   return { key: raw, prefix, name };
 }
 
+async function updateAlertsAction(formData: FormData) {
+  "use server";
+  const tenantId = (await getTenantIdForUser()) ?? "";
+  if (!tenantId) return;
+  const alertsEnabled = formData.get("alertsEnabled") === "on";
+  const alertsEmail   = String(formData.get("alertsEmail") ?? "").trim().toLowerCase();
+  await db.update(tenants).set({
+    alertsEnabled,
+    alertsEmail: alertsEmail || null,
+  }).where(eq(tenants.id, tenantId));
+  revalidatePath("/app/settings");
+}
+
 async function revokeApiKeyAction(_prev: unknown, formData: FormData) {
   "use server";
   const tenantId = (await getTenantIdForUser()) ?? "";
@@ -151,6 +164,49 @@ export default async function SettingsPage(props: { searchParams?: Promise<Recor
             <div style={labelStyle}>Human approval</div>
             <div style={{ ...pillStyle, background: "#F9FAFB", color: "#7F7F7F" }}>Always required</div>
           </div>
+        </section>
+
+        {/* ── Notifications ── */}
+        <section style={sectionStyle}>
+          <h2 style={sectionTitleStyle}>Email Notifications</h2>
+          <p style={{ margin: "0 0 14px", fontSize: 12, color: "#7F7F7F", lineHeight: 1.6 }}>
+            Get an email alert when urgent or escalated threads arrive. Alerts are batched and sent every 2 hours.
+          </p>
+          <form action={updateAlertsAction} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={rowStyle}>
+              <div>
+                <div style={labelStyle}>Enable alerts</div>
+                <div style={subtleStyle}>Email me when urgent or escalation threads are detected</div>
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" as const }}>
+                <input
+                  type="checkbox"
+                  name="alertsEnabled"
+                  defaultChecked={tenant?.alertsEnabled ?? false}
+                  style={{ width: 16, height: 16, accentColor: "#2563EB", cursor: "pointer" }}
+                />
+                <span style={{ fontSize: 12, color: "#374151" }}>
+                  {tenant?.alertsEnabled ? "Enabled" : "Disabled"}
+                </span>
+              </label>
+            </div>
+            <div style={rowStyle}>
+              <div>
+                <div style={labelStyle}>Alert email address</div>
+                <div style={subtleStyle}>Leave blank to use your contact email ({tenant?.contactEmail ?? "not set"})</div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  name="alertsEmail"
+                  type="email"
+                  defaultValue={tenant?.alertsEmail ?? ""}
+                  placeholder={tenant?.contactEmail ?? "you@company.com"}
+                  style={{ ...inputStyle, width: 220 }}
+                />
+                <button type="submit" style={buttonStyle}>Save</button>
+              </div>
+            </div>
+          </form>
         </section>
 
         <section style={sectionStyle}>

@@ -39,6 +39,9 @@ export const tenants = pgTable(
     trialEndsAt:  timestamp("trial_ends_at", { withTimezone: true }),
     notes:        text("notes"),               // CRM-lite: internal notes about this account
     contactEmail: text("contact_email"),       // primary contact at this company
+    // Alert notifications — email sent when urgent/escalation threads are detected
+    alertsEnabled: boolean("alerts_enabled").notNull().default(false),
+    alertsEmail:   text("alerts_email"),       // defaults to contactEmail if not set
     createdAt,
   },
   (t) => [index("tenants_created_at_idx").on(t.createdAt)],

@@ -1,6 +1,6 @@
 import { getTenantIdForUser } from "@/lib/auth";
 import { db } from "@/db";
-import { aiClassifications, aiDrafts, auditLogs, emailMessages, emailThreads, loads } from "@/db/schema";
+import { aiClassifications, aiDrafts, auditLogs, emailMessages, emailThreads, loads, tenants } from "@/db/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getAvgResponseTime, getResponseTimeByAudit } from "@/lib/analytics";
 
@@ -65,6 +65,7 @@ export default async function AnalyticsPage() {
   }
 
   const [
+    tenant,
     inboundEmails,
     classifiedEmails,
     draftsGenerated,
@@ -81,6 +82,7 @@ export default async function AnalyticsPage() {
     avgResponseAll,
     avgResponse7d,
   ] = await Promise.all([
+    db.query.tenants.findFirst({ where: eq(tenants.id, tenantId), columns: { name: true } }),
     db.$count(emailMessages, and(eq(emailMessages.tenantId, tenantId), eq(emailMessages.direction, "inbound"))),
     db.$count(aiClassifications, eq(aiClassifications.tenantId, tenantId)),
     db.$count(aiDrafts, eq(aiDrafts.tenantId, tenantId)),
@@ -115,7 +117,7 @@ export default async function AnalyticsPage() {
     <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16, background: "#FAFAF8", minHeight: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{ margin: 0, color: "#292929", fontSize: 20, fontWeight: 700 }}>Analytics</h1>
-        <span style={{ color: "#9CA3AF", fontSize: 12 }}>Tenant: {tenantId.slice(0, 8)}…</span>
+        <span style={{ color: "#9CA3AF", fontSize: 12 }}>{tenant?.name ?? tenantId.slice(0, 8)}</span>
       </div>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>

@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/chase-followups",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/alert-check",
+      "schedule": "0 */2 * * *"
     }
   ]
 }

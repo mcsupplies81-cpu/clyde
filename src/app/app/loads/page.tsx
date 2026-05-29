@@ -5,6 +5,7 @@ import { loads, apiKeys } from "@/db/schema";
 import { and, eq, desc } from "drizzle-orm";
 import { LoadsTableClient } from "./LoadsTableClient";
 import { AddLoadModal } from "./AddLoadModal";
+import { ImportLoadsModal } from "./ImportLoadsModal";
 import { addLoadAction, exportLoadsAction } from "./actions";
 
 export default async function LoadsPage() {
@@ -82,6 +83,7 @@ export default async function LoadsPage() {
             {/* Action buttons */}
             <div style={{ display: "flex", gap: 8, alignSelf: "center" }}>
               <ExportButton action={exportLoadsAction} count={allLoads.length} />
+              <ImportLoadsModal />
               <AddLoadModal action={addLoadAction} />
             </div>
           </div>
