@@ -5,6 +5,7 @@ const isPublicPage = createRouteMatcher([
   "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/invite(.*)",   // invite links are public — Clerk picks up auth after sign-up
 ]);
 
 // Routes that handle their own auth — bypass Clerk entirely
@@ -22,6 +23,8 @@ const hasClerkConfig = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 export default hasClerkConfig
   ? clerkMiddleware(async (auth, req) => {
       if (isSelfAuthRoute(req.nextUrl.pathname)) return NextResponse.next();
+
+      // /admin is Clerk-protected but also checked against ADMIN_EMAIL in the page itself
       if (!isPublicPage(req)) {
         await auth.protect();
       }

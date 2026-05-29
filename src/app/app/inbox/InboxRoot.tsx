@@ -98,6 +98,48 @@ const STATUS_DOT: Record<string, string> = {
   escalated: "#DC2626",
 };
 
+// ── Per-filter empty state ─────────────────────────────────────────────────────
+
+const FILTER_EMPTY: Record<string, { icon: string; title: string; sub: string }> = {
+  needs_review:  { icon: "✅", title: "All caught up",        sub: "No drafts waiting for your review." },
+  ready_to_send: { icon: "📤", title: "Nothing queued",       sub: "Approved drafts will appear here." },
+  sent:          { icon: "📬", title: "No sent emails yet",   sub: "Emails you send appear here." },
+  escalated:     { icon: "🟢", title: "No escalations",       sub: "High-priority flags will show here." },
+  resolved:      { icon: "📁", title: "Nothing resolved yet", sub: "Threads you close appear here." },
+  urgent:        { icon: "🟢", title: "No urgent threads",    sub: "Looking good — nothing flagged urgent." },
+  carrier_concern:{ icon: "🟢", title: "No carrier concerns", sub: "Re-brokering or compliance issues show here." },
+  pod_request:   { icon: "📄", title: "No POD requests",      sub: "Emails asking for proof of delivery show here." },
+  bol_request:   { icon: "📄", title: "No BOL requests",      sub: "Emails asking for bill of lading show here." },
+  quote_request: { icon: "💬", title: "No quote requests",    sub: "Rate quote inquiries appear here." },
+  status_request:{ icon: "📍", title: "No status requests",   sub: "Shipment status emails appear here." },
+  appointment_change: { icon: "📅", title: "No appointment changes", sub: "Reschedule requests appear here." },
+};
+
+function ThreadListEmpty({ filter, hasClientFilter }: { filter: string | undefined; hasClientFilter: boolean }) {
+  if (hasClientFilter) {
+    return (
+      <div style={{ padding: "48px 16px", textAlign: "center", color: "#C4C4C4", fontSize: 12 }}>
+        No threads match your filters
+      </div>
+    );
+  }
+  const meta = filter ? FILTER_EMPTY[filter] : null;
+  if (!meta) {
+    return (
+      <div style={{ padding: "48px 16px", textAlign: "center", color: "#C4C4C4", fontSize: 12 }}>
+        No threads here
+      </div>
+    );
+  }
+  return (
+    <div style={{ padding: "52px 20px", textAlign: "center" }}>
+      <div style={{ fontSize: 28, marginBottom: 10 }}>{meta.icon}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#5D5D5D", marginBottom: 4 }}>{meta.title}</div>
+      <div style={{ fontSize: 11, color: "#C4C4C4", lineHeight: 1.5 }}>{meta.sub}</div>
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function InboxRoot({
@@ -471,9 +513,7 @@ export function InboxRoot({
         {/* Thread list */}
         <div style={{ overflowY: "auto", flex: 1 }}>
           {filteredThreads.length === 0 && (
-            <div style={{ padding: "48px 16px", textAlign: "center", color: "#C4C4C4", fontSize: 12 }}>
-              {activeFilterCount > 0 ? "No threads match your filters" : "No threads here"}
-            </div>
+            <ThreadListEmpty filter={filter} hasClientFilter={activeFilterCount > 0} />
           )}
           {filteredThreads.map((t) => {
             const active = t.id === selectedId;

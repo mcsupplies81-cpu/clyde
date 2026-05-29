@@ -3,12 +3,12 @@ import { TopBar } from "@/components/TopBar";
 import { db } from "@/db";
 import { emailThreads, inboxes, tenants } from "@/db/schema";
 import { and, asc, eq, notInArray } from "drizzle-orm";
-import { getTenantIdForUser } from "@/lib/auth";
+import { getTenantIdForUser, isAdmin } from "@/lib/auth";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const tenantId = await getTenantIdForUser();
 
-  const [openCount, inbox, tenant] = await Promise.all([
+  const [openCount, inbox, tenant, adminUser] = await Promise.all([
     tenantId
       ? db.$count(emailThreads, and(eq(emailThreads.tenantId, tenantId), notInArray(emailThreads.status, ["resolved", "sent", "escalated"])))
       : Promise.resolve(0),
@@ -18,6 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     tenantId
       ? db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) })
       : Promise.resolve(null),
+    isAdmin(),
   ]);
 
   return (
@@ -25,6 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       inboxCount={openCount}
       inboxEmail={inbox?.emailAddress ?? null}
       companyName={tenant?.name ?? null}
+      showAdminLink={adminUser}
     >
       <TopBar companyName={tenant?.name ?? null} />
       <main style={{ flex: 1, overflow: "auto" }}>{children}</main>

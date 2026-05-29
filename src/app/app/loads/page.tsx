@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { loads, apiKeys } from "@/db/schema";
 import { and, eq, desc } from "drizzle-orm";
 import { LoadsTableClient } from "./LoadsTableClient";
+import { AddLoadModal } from "./AddLoadModal";
+import { addLoadAction, exportLoadsAction } from "./actions";
 
 export default async function LoadsPage() {
   const tenantId = await getTenantIdForUser();
@@ -40,11 +42,11 @@ export default async function LoadsPage() {
         flexWrap: "wrap" as const,
       }}>
         <span style={{ fontSize: 11, color: "#9CA3AF" }}>
-          🔗 <strong style={{ color: "#5D5D5D" }}>Read-only mirror</strong> - load data lives in your TMS. Clyde reads it to give AI replies context.
+          🔗 <strong style={{ color: "#5D5D5D" }}>TMS sync</strong> — push load updates via API, or add loads manually below.
         </span>
         <span style={{ flex: 1 }} />
         {hasApiKey ? (
-          <span style={{ fontSize: 11, color: "#16A34A", fontWeight: 600 }}>✓ API key active - push updates via POST /api/v1/loads</span>
+          <span style={{ fontSize: 11, color: "#16A34A", fontWeight: 600 }}>✓ API key active — POST /api/v1/loads</span>
         ) : (
           <Link href="/app/settings" style={{ fontSize: 11, color: "#2563EB", fontWeight: 600, textDecoration: "none" }}>
             Generate API key to sync from TMS →
@@ -60,10 +62,12 @@ export default async function LoadsPage() {
               Active Loads
             </h1>
             <div style={{ color: "#9CA3AF", fontSize: 12, marginTop: 4 }}>
-              {allLoads.length} loads - context for AI email drafting
+              {allLoads.length} load{allLoads.length !== 1 ? "s" : ""} · AI uses this data to draft replies
             </div>
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
+
+          {/* Right: stats + action buttons */}
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" as const }}>
             {[
               { label: "At Risk",    value: atRisk,     color: "#EA580C" },
               { label: "Exception",  value: exceptions,  color: "#DC2626" },
@@ -74,11 +78,43 @@ export default async function LoadsPage() {
                 <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 4, textTransform: "uppercase" as const, letterSpacing: "0.5px" }}>{label}</div>
               </div>
             ))}
+
+            {/* Action buttons */}
+            <div style={{ display: "flex", gap: 8, alignSelf: "center" }}>
+              <ExportButton action={exportLoadsAction} count={allLoads.length} />
+              <AddLoadModal action={addLoadAction} />
+            </div>
           </div>
         </div>
       </div>
 
       <LoadsTableClient loads={allLoads} />
     </div>
+  );
+}
+
+// ── CSV Export button (client component) ──────────────────────────────────────
+function ExportButton({ action, count }: { action: () => Promise<string>; count: number }) {
+  // Server-rendered anchor that triggers download — uses a separate API route
+  if (count === 0) return null;
+  return (
+    <a
+      href="/api/v1/loads/export"
+      download="clyde-loads.csv"
+      style={{
+        background: "#FFFFFF",
+        color: "#5D5D5D",
+        border: "1px solid #E8E8E8",
+        borderRadius: 7,
+        padding: "8px 14px",
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: "pointer",
+        textDecoration: "none",
+        display: "inline-block",
+      }}
+    >
+      ↓ Export CSV
+    </a>
   );
 }

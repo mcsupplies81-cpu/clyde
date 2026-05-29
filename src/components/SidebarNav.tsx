@@ -76,6 +76,9 @@ const NAV = [
   { label: "Settings",  href: "/app/settings",  Icon: IconSettings, badge: false },
 ];
 
+// Admin link shown separately — only visible when ADMIN_EMAIL matches current user
+// We check this client-side via a prop passed from the server layout
+
 function openSearch() {
   window.dispatchEvent(new CustomEvent("clyde:open-search"));
 }
@@ -87,12 +90,14 @@ export function SidebarNav({
   inboxCount = 0,
   inboxEmail = null,
   collapsed = false,
+  showAdminLink = false,
   onToggle,
 }: {
   inboxCount?: number;
   inboxEmail?: string | null;
   companyName?: string | null;
   collapsed?: boolean;
+  showAdminLink?: boolean;
   onToggle?: () => void;
 }) {
   const path = usePathname();
@@ -249,6 +254,19 @@ export function SidebarNav({
           );
         })}
       </nav>
+
+      {/* Admin link */}
+      {showAdminLink && (
+        <Link href="/admin" style={{
+          display: "flex", alignItems: "center", gap: 9,
+          padding: "6px 14px", margin: "0 8px 4px",
+          borderRadius: 6, textDecoration: "none",
+          fontSize: 11, fontWeight: 600, color: "#6366F1",
+          background: "#EEF2FF", letterSpacing: "0.3px",
+        }}>
+          ⚡ Admin
+        </Link>
+      )}
 
       {/* Inbox address footer */}
       {inboxEmail && (
